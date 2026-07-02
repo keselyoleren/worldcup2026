@@ -1,4 +1,4 @@
-import { Match, MatchStatus, MatchesPayload, DataSource } from "./types";
+import { Match, MatchStatus, MatchesPayload, DataSource, Scorer } from "./types";
 import { flagUrl } from "./countries";
 
 const FD_BASE = "https://api.football-data.org/v4";
@@ -164,4 +164,39 @@ export async function getMatches(): Promise<MatchesPayload> {
 
   matches.sort((x, y) => x.utcDate.localeCompare(y.utcDate));
   return { source, isLive, fetchedAt: new Date().toISOString(), matches };
+}
+
+// ---------------------------------------------------------------------------
+// Public: getScorers() — daftar pencetak gol turnamen (hanya football-data.org;
+// sumber fallback tidak punya data pemain, jadi kembalikan kosong)
+// ---------------------------------------------------------------------------
+export async function getScorers(limit = 100): Promise<Scorer[]> {
+  const fdKey = process.env.FOOTBALL_DATA_API_KEY;
+  if (!fdKey) return [];
+  try {
+    const res = await fetch(`${FD_BASE}/competitions/WC/scorers?limit=${limit}`, {
+      headers: { "X-Auth-Token": fdKey },
+      next: { revalidate: REVALIDATE_SECONDS },
+    });
+    if (!res.ok) return [];
+    const raw = await res.json();
+    return ((raw.scorers ?? []) as any[])
+      .map(
+        (s): Scorer => ({
+          id: s.player?.id ?? 0,
+          name: s.player?.name ?? "?",
+          team: s.team?.name ?? "?",
+          teamCrest: s.team?.crest,
+          goals: s.goals ?? 0,
+          assists: s.assists ?? 0,
+          penalties: s.penalties ?? 0,
+          played: s.playedMatches ?? 0,
+          dateOfBirth: s.player?.dateOfBirth,
+        })
+      )
+      .filter((s) => s.goals > 0)
+      .sort((a, b) => b.goals - a.goals || b.assists - a.assists);
+  } catch {
+    return [];
+  }
 }

@@ -1,4 +1,4 @@
-import { Match } from "./types";
+import { Match, Scorer } from "./types";
 import { expectedGoals, ratingOf, scoreMatrix, winExpectancy } from "./prediction";
 import { buildKnockoutBracket, KnockoutBracket } from "./bracket";
 
@@ -196,6 +196,16 @@ const SIZE_TITLE: Record<number, string> = {
   2: "Final",
 };
 
+// --- Perekam jumlah laga TERSISA tiap tim per iterasi (untuk Sepatu Emas) ---
+// Uint16Array per tim, indeks = nomor iterasi -> korelasi antar tim terjaga
+// (mis. dua tim yang bertemu di final sama-sama tercatat main di iterasi itu).
+type GamesRec = { byTeam: Map<string, Uint16Array>; i: number; iterations: number };
+function bumpGame(rec: GamesRec, team: string) {
+  let arr = rec.byTeam.get(team);
+  if (!arr) rec.byTeam.set(team, (arr = new Uint16Array(rec.iterations)));
+  arr[rec.i]++;
+}
+
 function recordPath(paths: PathTally, title: string, a: string, b: string, winner: string) {
   for (const [me, opp] of [[a, b], [b, a]] as const) {
     let byRound = paths.get(me);
@@ -220,7 +230,8 @@ function simulateOnce(
   sample: ScoreSampler,
   rng: Rng,
   ratings?: Record<string, number>,
-  paths?: PathTally
+  paths?: PathTally,
+  games?: GamesRec
 ) {
   const firsts: GroupTeam[] = [];
   const seconds: GroupTeam[] = [];
@@ -230,6 +241,7 @@ function simulateOnce(
     const s = new Map<string, { t: GroupTeam; pts: number; gd: number; gf: number }>();
     for (const t of g.teams) s.set(t.team, { t, pts: t.basePts, gd: t.baseGd, gf: t.baseGf });
     for (const p of g.pending) {
+      if (games) { bumpGame(games, p.home); bumpGame(games, p.away); }
       const [hg, ag] = sample(p.home, p.away);
       const H = s.get(p.home)!, A = s.get(p.away)!;
       H.gf += hg; A.gf += ag; H.gd += hg - ag; A.gd += ag - hg;
@@ -275,6 +287,7 @@ function simulateOnce(
     for (let i = 0; i < bracket.length; i += 2) {
       const a = bracket[i], b = bracket[i + 1];
       if (!b) { winners.push(a); continue; }
+      if (games) { bumpGame(games, a.team); bumpGame(games, b.team); }
       const w = knockoutWinner(a.team, b.team, sample, rng, ratings) === a.team ? a : b;
       if (paths && title) recordPath(paths, title, a.team, b.team, w.team);
       winners.push(w);
@@ -304,7 +317,8 @@ function simulateKnockoutOnce(
   sample: ScoreSampler,
   rng: Rng,
   ratings?: Record<string, number>,
-  paths?: PathTally
+  paths?: PathTally,
+  games?: GamesRec
 ) {
   const bump = (team: string | null, field: keyof Omit<Tally, "team" | "crest">) => {
     if (!team) return;
@@ -342,8 +356,10 @@ function simulateKnockoutOnce(
 
       let w: string | null;
       if (m.finished && m.winner) w = m.winner;
-      else if (home && away) w = knockoutWinner(home, away, sample, rng, ratings);
-      else w = home ?? away; // slot lawan belum diketahui -> lolos sementara
+      else if (home && away) {
+        if (games) { bumpGame(games, home); bumpGame(games, away); }
+        w = knockoutWinner(home, away, sample, rng, ratings);
+      } else w = home ?? away; // slot lawan belum diketahui -> lolos sementara
       if (paths && home && away && w) recordPath(paths, ko.titles[k], home, away, w);
       winners.push(w);
     }
@@ -359,7 +375,8 @@ function runCore(
   iterations: number,
   ratings: Record<string, number> | undefined,
   seed: number,
-  paths?: PathTally
+  paths?: PathTally,
+  games?: GamesRec
 ): TeamOdds[] {
   const groups = buildGroups(matches);
   const tally = makeTally(groups);
@@ -375,11 +392,101 @@ function runCore(
       for (const s of [m.home, m.away])
         if (s.name && !tally.has(s.name))
           tally.set(s.name, { team: s.name, crest: s.crest, advance: 0, quarter: 0, semi: 0, final: 0, champion: 0 });
-    for (let i = 0; i < iterations; i++) simulateKnockoutOnce(ko, tally, sample, rng, ratings, paths);
+    for (let i = 0; i < iterations; i++) {
+      if (games) games.i = i;
+      simulateKnockoutOnce(ko, tally, sample, rng, ratings, paths, games);
+    }
   } else {
-    for (let i = 0; i < iterations; i++) simulateOnce(groups, tally, sample, rng, ratings, paths);
+    for (let i = 0; i < iterations; i++) {
+      if (games) games.i = i;
+      simulateOnce(groups, tally, sample, rng, ratings, paths, games);
+    }
   }
   return toOdds(tally, iterations, ratings);
+}
+
+// ===========================================================================
+//  Perburuan Sepatu Emas: proyeksi gol akhir tiap pencetak gol.
+//  Jumlah laga tersisa tiap tim diambil per-iterasi dari proyeksi turnamen
+//  yang sama (korelasi antar tim terjaga), lalu gol tambahan pemain di-sample
+//  Poisson dari laju golnya (dengan shrinkage agar sampel kecil tidak liar).
+// ===========================================================================
+export interface GoldenBootEntry {
+  name: string;
+  team: string;
+  teamCrest?: string;
+  goals: number;
+  assists: number;
+  played: number;
+  rate: number; // laju gol per laga terkalibrasi
+  expMatches: number; // ekspektasi jumlah laga tersisa timnya
+  expFinal: number; // ekspektasi gol di akhir turnamen
+  winProb: number; // % memenangi Sepatu Emas
+  teamAlive: boolean;
+}
+
+export function predictGoldenBoot(
+  matches: Match[],
+  scorers: Scorer[],
+  ratings?: Record<string, number>,
+  iterations = 10000
+): GoldenBootEntry[] {
+  if (!scorers.length) return [];
+  const games: GamesRec = { byTeam: new Map(), i: 0, iterations };
+  runCore(matches, iterations, ratings, 0x2026_0611, undefined, games);
+
+  // kandidat realistis: 20 pencetak gol teratas
+  const candidates = scorers.slice(0, 20);
+  const rng = mulberry32(0xb007);
+
+  // shrinkage: laju gol ditarik ke rata-rata penyerang (0.35 gol/laga, bobot
+  // setara 3 laga) agar pemain dengan sedikit laga tidak diproyeksikan liar
+  const PRIOR_GAMES = 3;
+  const PRIOR_RATE = 0.35;
+  const rates = candidates.map(
+    (s) => (s.goals + PRIOR_RATE * PRIOR_GAMES) / (Math.max(s.played, 1) + PRIOR_GAMES)
+  );
+
+  const wins = new Array(candidates.length).fill(0);
+  const sumFinal = new Array(candidates.length).fill(0);
+  const sumMatches = new Array(candidates.length).fill(0);
+
+  for (let i = 0; i < iterations; i++) {
+    let best = -1;
+    let bestGoals = -1;
+    let bestAssists = -1;
+    for (let c = 0; c < candidates.length; c++) {
+      const s = candidates[c];
+      const n = games.byTeam.get(s.team)?.[i] ?? 0;
+      const add = n > 0 ? samplePoisson(rates[c] * n, rng) : 0;
+      const total = s.goals + add;
+      sumFinal[c] += total;
+      sumMatches[c] += n;
+      // tie-break Sepatu Emas: gol, lalu assist (posisi teratas menang sisanya)
+      if (total > bestGoals || (total === bestGoals && s.assists > bestAssists)) {
+        best = c;
+        bestGoals = total;
+        bestAssists = s.assists;
+      }
+    }
+    if (best >= 0) wins[best]++;
+  }
+
+  return candidates
+    .map((s, c) => ({
+      name: s.name,
+      team: s.team,
+      teamCrest: s.teamCrest,
+      goals: s.goals,
+      assists: s.assists,
+      played: s.played,
+      rate: rates[c],
+      expMatches: sumMatches[c] / iterations,
+      expFinal: sumFinal[c] / iterations,
+      winProb: (wins[c] / iterations) * 100,
+      teamAlive: sumMatches[c] / iterations > 0.01,
+    }))
+    .sort((a, b) => b.winProb - a.winProb || b.goals - a.goals);
 }
 
 // ===========================================================================

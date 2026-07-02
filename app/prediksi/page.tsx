@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { getMatches } from "@/lib/football-api";
+import { getMatches, getScorers } from "@/lib/football-api";
 import { predict, pct } from "@/lib/prediction";
 import { liveRatings } from "@/lib/elo";
+import { teamGoalsMap, matchThreats, Threat } from "@/lib/players";
 import { Crest, ProbBar } from "@/components/ui";
 import { Match } from "@/lib/types";
 
@@ -14,9 +15,10 @@ function isPredictable(m: Match) {
 }
 
 export default async function PrediksiPage() {
-  const { matches } = await getMatches();
+  const [{ matches }, scorers] = await Promise.all([getMatches(), getScorers()]);
   const upcoming = matches.filter(isPredictable).slice(0, 30);
   const ratings = liveRatings(matches);
+  const goals = teamGoalsMap(matches);
 
   return (
     <div>
@@ -25,7 +27,12 @@ export default async function PrediksiPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {upcoming.map((m) => (
-            <PredictionCard key={m.id} match={m} ratings={ratings} />
+            <PredictionCard
+              key={m.id}
+              match={m}
+              ratings={ratings}
+              threats={matchThreats(m.home.name, m.away.name, scorers, goals, ratings)}
+            />
           ))}
         </div>
       )}
@@ -33,7 +40,15 @@ export default async function PrediksiPage() {
   );
 }
 
-function PredictionCard({ match, ratings }: { match: Match; ratings: Record<string, number> }) {
+function PredictionCard({
+  match,
+  ratings,
+  threats,
+}: {
+  match: Match;
+  ratings: Record<string, number>;
+  threats: { home: Threat | null; away: Threat | null };
+}) {
   const p = predict(match.home.name, match.away.name, ratings);
   const date = new Date(match.utcDate).toLocaleString("id-ID", {
     day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
@@ -69,6 +84,15 @@ function PredictionCard({ match, ratings }: { match: Match; ratings: Record<stri
         />
       </div>
 
+      {/* Ancaman utama kedua tim */}
+      {(threats.home || threats.away) && (
+        <div className="mt-3 flex items-center justify-between gap-2 text-xs text-(--color-muted)">
+          <ThreatChip t={threats.home} />
+          <span className="text-[10px] font-bold uppercase tracking-wide text-white/40">ancaman</span>
+          <ThreatChip t={threats.away} right />
+        </div>
+      )}
+
       {/* Perkiraan gol + skor alternatif */}
       <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs text-(--color-muted)">
         <span>🕑 {date}</span>
@@ -82,6 +106,20 @@ function PredictionCard({ match, ratings }: { match: Match; ratings: Record<stri
         </span>
       </div>
     </div>
+  );
+}
+
+function ThreatChip({ t, right }: { t: Threat | null; right?: boolean }) {
+  if (!t) return <span className="flex-1" />;
+  return (
+    <span className={`flex flex-1 items-center gap-1.5 ${right ? "justify-end text-right" : ""}`}>
+      <span className="truncate">
+        ⚡ <b className="text-(--color-fg)">{t.scorer.name}</b>{" "}
+        <span className="whitespace-nowrap">
+          {Math.round(t.prob * 100)}% cetak gol
+        </span>
+      </span>
+    </span>
   );
 }
 

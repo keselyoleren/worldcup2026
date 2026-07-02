@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMatches } from "@/lib/football-api";
+import { getMatches, getScorers } from "@/lib/football-api";
 import { predict, pct } from "@/lib/prediction";
 import { liveRatings } from "@/lib/elo";
 import { teamForm, headToHead } from "@/lib/stats";
 import { isRealTeam } from "@/lib/simulate";
+import { teamGoalsMap, matchThreats } from "@/lib/players";
 import { Crest, StatusBadge, ProbBar, FormBadges, MatchCard, SourceBanner } from "@/components/ui";
 import { ScoreHeatmap } from "@/components/ScoreHeatmap";
+import { DuelBintang } from "@/components/DuelBintang";
 
 export const revalidate = 60;
 // id match berbeda antar sumber data (numeric vs "of-*") — jangan pre-render
 
 export default async function LagaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { matches, source, isLive } = await getMatches();
+  const [{ matches, source, isLive }, scorers] = await Promise.all([getMatches(), getScorers()]);
   const match = matches.find((m) => m.id === id);
   if (!match) notFound();
 
@@ -22,7 +24,11 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
   const showScore = status === "FINISHED" || status === "IN_PLAY" || status === "PAUSED";
   const finished = status === "FINISHED" && score.home !== null && score.away !== null;
 
-  const p = predictable ? predict(home.name, away.name, liveRatings(matches)) : null;
+  const ratings = liveRatings(matches);
+  const p = predictable ? predict(home.name, away.name, ratings) : null;
+  const threats = predictable
+    ? matchThreats(home.name, away.name, scorers, teamGoalsMap(matches), ratings)
+    : { home: null, away: null };
   const formHome = predictable ? teamForm(matches, home.name) : [];
   const formAway = predictable ? teamForm(matches, away.name) : [];
   const h2h = predictable
@@ -131,6 +137,9 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
               </p>
             </div>
           </section>
+
+          {/* Duel bintang kedua tim */}
+          <DuelBintang home={threats.home} away={threats.away} finished={finished} />
 
           {/* Form 5 laga terakhir */}
           <section className="mb-8">

@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/ranking", label: "Ranking" },
   { href: "/prediksi-juara", label: "Prediksi Juara" },
   { href: "/jalur-juara", label: "Jalur Juara" },
+  { href: "/sepatu-emas", label: "Sepatu Emas" },
   { href: "/bracket", label: "Bracket" },
   { href: "/tebak-skor", label: "Tebak Skor" },
 ];

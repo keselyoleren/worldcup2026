@@ -31,6 +31,19 @@ export interface Match {
   };
 }
 
+// Pencetak gol turnamen (dari endpoint /scorers football-data.org)
+export interface Scorer {
+  id: number;
+  name: string;
+  team: string;
+  teamCrest?: string;
+  goals: number;
+  assists: number;
+  penalties: number;
+  played: number;
+  dateOfBirth?: string;
+}
+
 export type DataSource = "football-data.org" | "api-football" | "openfootball (fallback)";
 
 export interface MatchesPayload {
