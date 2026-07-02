@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@theme {
+  /* Palet "floodlit pitch" — dark editorial, bukan glassmorphism */
+  --color-bg: #0d1210;
+  --color-surface: #141b18;
+  --color-surface-2: #1a2320;
+  --color-line: #2a332e;
+  --color-fg: #f2f3ee;
+  --color-muted: #a3ada5;
+  --color-accent: #f5c518;   /* kuning trophy */
+  --color-gold: #f5c518;     /* alias lama */
+  --color-live: #ff3b30;
+  --color-win: #37c871;      /* hijau lapangan */
+  --color-away: #4c9be0;
+  --color-ink: #0a0d0b;
+
+  /* Palet kategorikal chart — slot tetap, jangan di-cycle */
+  --color-chart-1: #f5c518;
+  --color-chart-2: #4c9be0;
+  --color-chart-3: #37c871;
+  --color-chart-4: #e87ba4;
+  --color-chart-5: #a78bfa;
+  --color-chart-6: #eb6834;
+
+  --font-display: var(--font-anton), "Arial Narrow", Impact, sans-serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+body {
+  background-color: var(--color-bg);
+  /* garis lapangan halus, bukan gradient blob */
+  background-image: repeating-linear-gradient(
+    180deg,
+    transparent 0,
+    transparent 119px,
+    rgba(255, 255, 255, 0.014) 119px,
+    rgba(255, 255, 255, 0.014) 120px
+  );
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Judul kondensari ala papan skor / wallchart */
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+  line-height: 0.92;
+}
+
+/* Label kecil di atas judul (editorial overline) */
+.overline {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+/* Panel rata — border tegas, tanpa blur/glow */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+}
+
+/* Angka skor: tabular & kondensari */
+.tnum {
+  font-family: var(--font-display);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.rule {
+  height: 3px;
+  background: var(--color-fg);
+  width: 34px;
+}
+
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--color-live);
+  display: inline-block;
+}
+@keyframes blink {
+  0%, 60% { opacity: 1; }
+  80%, 100% { opacity: 0.25; }
+}
+.blink { animation: blink 1.1s steps(1) infinite; }
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-ink);
+}
