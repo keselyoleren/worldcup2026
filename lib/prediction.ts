@@ -1,6 +1,15 @@
-// Model prediksi skor berbasis distribusi Poisson.
-// Kekuatan tim (0-100) diturunkan dari peringkat FIFA/ekspektasi pra-turnamen.
-// Semakin tinggi rating -> semakin tinggi expected goals (xG) tim tsb.
+// ===========================================================================
+//  Model prediksi skor — Poisson Dixon-Coles bertenaga rating Elo
+//  - Kekuatan tim (0-100) di-seed dari peringkat FIFA/ekspektasi pra-turnamen,
+//    bisa dioverride rating Elo live (lib/elo.ts).
+//  - Expected goals diturunkan dari SELISIH Elo (bukan rasio pangkat) —
+//    kalibrasi ±ELO_PER_GOAL poin Elo ≈ 1 gol keunggulan, jauh lebih stabil
+//    untuk pasangan tim yang timpang.
+//  - Koreksi Dixon-Coles memperbaiki probabilitas skor rendah (0-0, 1-1)
+//    yang selalu di-underestimate oleh Poisson independen.
+//  - Keunggulan tuan rumah hanya diberikan ke host 2026 (AS, Meksiko,
+//    Kanada); laga lain dianggap venue netral.
+// ===========================================================================
 
 const TEAM_RATING: Record<string, number> = {
   Argentina: 92, France: 91, Spain: 90, England: 89, Brazil: 88,
@@ -23,8 +32,16 @@ const TEAM_RATING: Record<string, number> = {
 };
 
 const DEFAULT_RATING = 68;
-const HOME_ADVANTAGE = 1.15; // faktor tuan rumah / momentum
-const BASE_GOALS = 1.35; // rata-rata gol per tim per laga
+
+// --- Kalibrasi model ---
+const ELO_BASE = 1000;
+const ELO_SCALE = 10; // rating 0-100 -> Elo 1000-2000 (konsisten dgn lib/elo.ts)
+const TOTAL_GOALS = 2.7; // rata-rata total gol per laga turnamen besar
+const ELO_PER_GOAL = 140; // selisih Elo yang setara ~1 gol keunggulan
+const HOST_ELO_BONUS = 60; // keunggulan tuan rumah untuk host 2026
+const RHO = -0.1; // koefisien Dixon-Coles (korelasi skor rendah)
+
+const HOSTS = new Set(["United States", "USA", "Mexico", "Canada"]);
 
 // ratings: override kekuatan tim (mis. rating Elo live) — tanpa override,
 // dipakai tabel statis pra-turnamen.
@@ -33,21 +50,29 @@ export function ratingOf(team: string, ratings?: Record<string, number>): number
   return ratings?.[t] ?? TEAM_RATING[t] ?? DEFAULT_RATING;
 }
 
-// Expected goals kedua tim. neutral=true -> tanpa keunggulan tuan rumah
-// (dipakai untuk simulasi turnamen di venue netral).
+function eloOf(team: string, ratings?: Record<string, number>): number {
+  return ELO_BASE + ratingOf(team, ratings) * ELO_SCALE;
+}
+
+// Probabilitas menang klasik Elo (tanpa bonus tuan rumah) — dipakai a.l.
+// untuk memodelkan adu penalti.
+export function winExpectancy(home: string, away: string, ratings?: Record<string, number>): number {
+  const diff = eloOf(home, ratings) - eloOf(away, ratings);
+  return 1 / (1 + Math.pow(10, -diff / 400));
+}
+
+// Expected goals kedua tim. Selisih Elo dipetakan linier ke selisih gol,
+// total gol dijaga di sekitar rata-rata turnamen. Bonus tuan rumah otomatis
+// diberikan bila tim "home" adalah negara host.
 export function expectedGoals(
   home: string,
   away: string,
-  neutral = true,
   ratings?: Record<string, number>
 ): [number, number] {
-  const rh = ratingOf(home, ratings);
-  const ra = ratingOf(away, ratings);
-  const adv = neutral ? 1 : HOME_ADVANTAGE;
-  return [
-    clamp(BASE_GOALS * Math.pow(rh / ra, 1.35) * adv),
-    clamp(BASE_GOALS * Math.pow(ra / rh, 1.35)),
-  ];
+  const bonus = HOSTS.has(home.trim()) ? HOST_ELO_BONUS : 0;
+  const diff = eloOf(home, ratings) + bonus - eloOf(away, ratings);
+  const supremacy = diff / ELO_PER_GOAL; // perkiraan selisih gol home - away
+  return [clamp(TOTAL_GOALS / 2 + supremacy / 2), clamp(TOTAL_GOALS / 2 - supremacy / 2)];
 }
 
 function poisson(k: number, lambda: number): number {
@@ -57,6 +82,39 @@ function factorial(n: number): number {
   let r = 1;
   for (let i = 2; i <= n; i++) r *= i;
   return r;
+}
+
+// Koreksi Dixon-Coles: menaikkan peluang 0-0 & 1-1, menurunkan 1-0 & 0-1
+// (RHO negatif) — sesuai pola hasil sepak bola nyata.
+function tau(h: number, a: number, lh: number, la: number): number {
+  if (h === 0 && a === 0) return 1 - lh * la * RHO;
+  if (h === 0 && a === 1) return 1 + lh * RHO;
+  if (h === 1 && a === 0) return 1 + la * RHO;
+  if (h === 1 && a === 1) return 1 - RHO;
+  return 1;
+}
+
+const MAX = 8; // grid skor 0..8 gol
+
+// Matriks probabilitas skor ternormalisasi: matrix[golHome][golAway].
+export function scoreMatrix(
+  home: string,
+  away: string,
+  ratings?: Record<string, number>
+): { matrix: number[][]; homeXg: number; awayXg: number } {
+  const [lh, la] = expectedGoals(home, away, ratings);
+  const matrix: number[][] = [];
+  let sum = 0;
+  for (let i = 0; i <= MAX; i++) {
+    matrix.push([]);
+    for (let j = 0; j <= MAX; j++) {
+      const p = poisson(i, lh) * poisson(j, la) * tau(i, j, lh, la);
+      matrix[i].push(p);
+      sum += p;
+    }
+  }
+  for (let i = 0; i <= MAX; i++) for (let j = 0; j <= MAX; j++) matrix[i][j] /= sum;
+  return { matrix, homeXg: lh, awayXg: la };
 }
 
 export interface Prediction {
@@ -77,27 +135,17 @@ export function predict(
   awayTeam: string,
   ratings?: Record<string, number>
 ): Prediction {
-  const rh = ratingOf(homeTeam, ratings);
-  const ra = ratingOf(awayTeam, ratings);
+  const { matrix, homeXg, awayXg } = scoreMatrix(homeTeam, awayTeam, ratings);
 
-  // Expected goals: skala kekuatan relatif + keunggulan tuan rumah.
-  const homeXg = clamp(BASE_GOALS * Math.pow(rh / ra, 1.35) * HOME_ADVANTAGE);
-  const awayXg = clamp(BASE_GOALS * Math.pow(ra / rh, 1.35));
-
-  const MAX = 8;
   let homeWin = 0, draw = 0, awayWin = 0;
   const grid: { score: string; prob: number }[] = [];
-  const matrix: number[][] = [];
-
   for (let i = 0; i <= MAX; i++) {
-    matrix.push([]);
     for (let j = 0; j <= MAX; j++) {
-      const p = poisson(i, homeXg) * poisson(j, awayXg);
+      const p = matrix[i][j];
       if (i > j) homeWin += p;
       else if (i === j) draw += p;
       else awayWin += p;
       grid.push({ score: `${i}-${j}`, prob: p });
-      matrix[i].push(p);
     }
   }
 
@@ -113,13 +161,13 @@ export function predict(
     likelyScore: { home: likely[0], away: likely[1] },
     topScores: grid.slice(0, 5),
     matrix,
-    homeRating: rh,
-    awayRating: ra,
+    homeRating: ratingOf(homeTeam, ratings),
+    awayRating: ratingOf(awayTeam, ratings),
   };
 }
 
 function clamp(v: number) {
-  return Math.max(0.15, Math.min(v, 4.5));
+  return Math.max(0.2, Math.min(v, 4.2));
 }
 function round1(v: number) {
   return Math.round(v * 10) / 10;

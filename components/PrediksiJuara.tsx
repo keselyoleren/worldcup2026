@@ -1,45 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Match } from "@/lib/types";
-import { runSimulations, TeamOdds, buildGroups } from "@/lib/simulate";
+import { useState } from "react";
+import Link from "next/link";
+import { TeamOdds } from "@/lib/simulate";
 import { Crest } from "./ui";
 
-const PRESETS = [1000, 5000, 20000];
-
-export function Simulasi({
-  matches,
-  ratings,
+export function PrediksiJuara({
+  odds,
+  iterations,
+  pendingGroup,
+  teamCount,
 }: {
-  matches: Match[];
-  ratings?: Record<string, number>; // rating Elo live dari server
+  odds: TeamOdds[];
+  iterations: number;
+  pendingGroup: number;
+  teamCount: number;
 }) {
-  const [odds, setOdds] = useState<TeamOdds[]>([]);
-  const [progress, setProgress] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
-
-  const groups = useMemo(() => buildGroups(matches), [matches]);
-  const pendingGroup = groups.reduce((n, g) => n + g.pending.length, 0);
-  const playedGroup = groups.reduce((n, g) => n + g.teams.length, 0);
-
-  const run = (n: number) => {
-    setRunning(true);
-    setTotal(n);
-    setProgress(0);
-    runSimulations(
-      matches,
-      n,
-      (p) => {
-        setProgress(p.done);
-        setOdds(p.odds);
-        if (p.done >= p.total) setRunning(false);
-      },
-      400,
-      ratings
-    );
-  };
 
   const filtered = query
     ? odds.filter((o) => o.team.toLowerCase().includes(query.toLowerCase()))
@@ -48,45 +25,9 @@ export function Simulasi({
 
   return (
     <div>
-      <div className="card mb-6 p-4">
-        <div className="mb-3 text-sm text-white/70">
-          Hasil laga yang sudah selesai dipakai apa adanya. Komputer lalu memainkan{" "}
-          <b className="text-white">{pendingGroup}</b> laga grup yang tersisa beserta seluruh fase
-          gugur ({playedGroup} tim). Pilih jumlah simulasi di bawah — semakin banyak, semakin
-          akurat hasilnya.
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {PRESETS.map((n) => (
-            <button
-              key={n}
-              disabled={running}
-              onClick={() => run(n)}
-              className="rounded-full bg-(--color-gold) px-4 py-1.5 text-sm font-semibold text-black transition hover:brightness-95 disabled:opacity-40"
-            >
-              🎲 Jalankan {n.toLocaleString("id-ID")} Simulasi
-            </button>
-          ))}
-          {running && <span className="text-xs text-white/60">Sedang menghitung…</span>}
-        </div>
-
-        {total > 0 && (
-          <div className="mt-3">
-            <div className="h-2 overflow-hidden rounded-full bg-white/10">
-              <div
-                className="h-full bg-(--color-gold) transition-all"
-                style={{ width: `${(progress / total) * 100}%` }}
-              />
-            </div>
-            <div className="mt-1 text-right text-xs text-white/60">
-              {progress.toLocaleString("id-ID")} dari {total.toLocaleString("id-ID")} simulasi selesai
-            </div>
-          </div>
-        )}
-      </div>
-
       {odds.length === 0 ? (
         <div className="card p-10 text-center text-white/60">
-          Klik salah satu tombol di atas untuk mulai menghitung peluang juara tiap tim 🏆
+          Belum ada data grup yang bisa diproyeksikan saat ini.
         </div>
       ) : (
         <>
@@ -128,14 +69,18 @@ export function Simulasi({
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((o, i) => (
+                {filtered.map((o) => (
                   <tr key={o.team} className="border-t border-white/5">
                     <td className="px-3 py-2">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 text-xs text-white/50">{i + 1}</span>
+                      <Link
+                        href={`/jalur-juara?tim=${encodeURIComponent(o.team)}`}
+                        className="flex items-center gap-2 hover:text-(--color-accent)"
+                        title={`Lihat jalur juara ${o.team}`}
+                      >
+                        <span className="w-4 text-xs text-white/50">{odds.indexOf(o) + 1}</span>
                         <Crest src={o.crest} name={o.team} />
                         <span className="truncate">{o.team}</span>
-                      </div>
+                      </Link>
                     </td>
                     <Cell v={o.advance} />
                     <Cell v={o.quarter} />

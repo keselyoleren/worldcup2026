@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 export const metadata: Metadata = {
   title: "World Cup 2026 — Jadwal, Statistik & Prediksi",
   description:
-    "Portal FIFA World Cup 2026: jadwal pertandingan terbaru, klasemen grup, statistik, prediksi skor, simulasi juara, dan permainan tebak skor.",
+    "Portal FIFA World Cup 2026: jadwal pertandingan terbaru, klasemen grup, statistik, prediksi skor, prediksi juara, dan permainan tebak skor.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

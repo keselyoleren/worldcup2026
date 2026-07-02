@@ -8,7 +8,8 @@ const LINKS = [
   { href: "/statistik", label: "Statistik" },
   { href: "/prediksi", label: "Prediksi" },
   { href: "/ranking", label: "Ranking" },
-  { href: "/simulasi", label: "Simulasi" },
+  { href: "/prediksi-juara", label: "Prediksi Juara" },
+  { href: "/jalur-juara", label: "Jalur Juara" },
   { href: "/bracket", label: "Bracket" },
   { href: "/tebak-skor", label: "Tebak Skor" },
 ];

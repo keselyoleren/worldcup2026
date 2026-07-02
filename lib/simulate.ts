@@ -1,11 +1,15 @@
 import { Match } from "./types";
-import { expectedGoals, ratingOf } from "./prediction";
+import { expectedGoals, ratingOf, scoreMatrix, winExpectancy } from "./prediction";
+import { buildKnockoutBracket, KnockoutBracket } from "./bracket";
 
 // ===========================================================================
-//  Monte Carlo tournament simulator
+//  Mesin prediksi juara (proyeksi turnamen Monte Carlo)
 //  - Hasil pertandingan fase grup yang SUDAH selesai dikunci (dipakai apa adanya)
-//  - Sisa laga grup + seluruh fase gugur disimulasikan dari model Poisson
-//  - Dijalankan ribuan kali untuk mengestimasi peluang tiap tim
+//  - Sisa laga grup + seluruh fase gugur diproyeksikan dari matriks skor
+//    Poisson Dixon-Coles (lib/prediction.ts), bukan Poisson independen
+//  - Laga gugur yang imbang dilanjutkan perpanjangan waktu, lalu adu penalti
+//    (hampir 50-50, sedikit condong ke tim lebih kuat)
+//  - RNG deterministik (mulberry32) -> hasil stabil & reprodusibel antar render
 // ===========================================================================
 
 interface GroupTeam {
@@ -19,7 +23,7 @@ interface GroupTeam {
 interface GroupModel {
   name: string;
   teams: GroupTeam[];
-  // laga fase grup yang belum selesai (perlu disimulasikan)
+  // laga fase grup yang belum selesai (perlu diproyeksikan)
   pending: { home: string; away: string }[];
 }
 
@@ -76,29 +80,81 @@ export function buildGroups(matches: Match[]): GroupModel[] {
   return [...groups.values()].filter((g) => g.teams.length >= 2).sort((x, y) => x.name.localeCompare(y.name));
 }
 
-// --- Sampler Poisson (Knuth) ---
-function samplePoisson(lambda: number): number {
+// --- RNG deterministik (mulberry32) ---
+type Rng = () => number;
+function mulberry32(seed: number): Rng {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// --- Sampler Poisson (Knuth) — dipakai untuk babak perpanjangan waktu ---
+function samplePoisson(lambda: number, rng: Rng): number {
   const L = Math.exp(-lambda);
   let k = 0, p = 1;
   do {
     k++;
-    p *= Math.random();
+    p *= rng();
   } while (p > L);
   return k - 1;
 }
 
-function simMatchGoals(home: string, away: string, ratings?: Record<string, number>): [number, number] {
-  const [lh, la] = expectedGoals(home, away, true, ratings);
-  return [samplePoisson(lh), samplePoisson(la)];
+// Sampler skor dari matriks Dixon-Coles, CDF di-cache per pasangan tim
+// (rating tetap selama satu run, jadi matriks cukup dihitung sekali).
+type ScoreSampler = (home: string, away: string) => [number, number];
+function makeSampler(ratings: Record<string, number> | undefined, rng: Rng): ScoreSampler {
+  const cache = new Map<string, { cdf: number[]; side: number }>();
+  return (home, away) => {
+    const key = `${home}::${away}`;
+    let e = cache.get(key);
+    if (!e) {
+      const { matrix } = scoreMatrix(home, away, ratings);
+      const side = matrix.length;
+      const cdf: number[] = [];
+      let acc = 0;
+      for (let h = 0; h < side; h++)
+        for (let a = 0; a < side; a++) {
+          acc += matrix[h][a];
+          cdf.push(acc);
+        }
+      e = { cdf, side };
+      cache.set(key, e);
+    }
+    const r = rng() * e.cdf[e.cdf.length - 1];
+    let lo = 0, hi = e.cdf.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (e.cdf[mid] < r) lo = mid + 1;
+      else hi = mid;
+    }
+    return [Math.floor(lo / e.side), lo % e.side];
+  };
 }
 
-// pemenang fase gugur (tidak boleh seri -> adu penalti berdasar kekuatan)
-function knockoutWinner(a: string, b: string, ratings?: Record<string, number>): string {
-  const [ga, gb] = simMatchGoals(a, b, ratings);
+// Pemenang fase gugur: 90 menit -> perpanjangan waktu -> adu penalti.
+function knockoutWinner(
+  a: string,
+  b: string,
+  sample: ScoreSampler,
+  rng: Rng,
+  ratings?: Record<string, number>
+): string {
+  const [ga, gb] = sample(a, b);
   if (ga > gb) return a;
   if (gb > ga) return b;
-  const ra = ratingOf(a, ratings), rb = ratingOf(b, ratings);
-  return Math.random() < ra / (ra + rb) ? a : b;
+  // perpanjangan waktu 2x15 menit ≈ sepertiga intensitas laga normal
+  const [lh, la] = expectedGoals(a, b, ratings);
+  const ea = samplePoisson(lh / 3, rng);
+  const eb = samplePoisson(la / 3, rng);
+  if (ea > eb) return a;
+  if (eb > ea) return b;
+  // adu penalti: hampir koin, sedikit condong ke tim lebih kuat
+  const we = winExpectancy(a, b, ratings);
+  return rng() < 0.5 + (we - 0.5) * 0.35 ? a : b;
 }
 
 // urutan seed bracket standar (1 & 2 bertemu paling akhir)
@@ -127,14 +183,45 @@ interface Tally {
   champion: number;
 }
 
-export interface SimProgress {
-  done: number;
-  total: number;
-  odds: TeamOdds[];
+// --- Perekam jalur: siapa-lawan-siapa per ronde di tiap proyeksi ---
+// team -> judul ronde -> { berapa kali sampai, berapa kali menang, lawan }
+type RoundStat = { reach: number; win: number; opp: Map<string, { meet: number; win: number }> };
+type PathTally = Map<string, Map<string, RoundStat>>;
+
+const SIZE_TITLE: Record<number, string> = {
+  32: "32 Besar",
+  16: "16 Besar",
+  8: "Perempat Final",
+  4: "Semifinal",
+  2: "Final",
+};
+
+function recordPath(paths: PathTally, title: string, a: string, b: string, winner: string) {
+  for (const [me, opp] of [[a, b], [b, a]] as const) {
+    let byRound = paths.get(me);
+    if (!byRound) paths.set(me, (byRound = new Map()));
+    let st = byRound.get(title);
+    if (!st) byRound.set(title, (st = { reach: 0, win: 0, opp: new Map() }));
+    st.reach++;
+    let o = st.opp.get(opp);
+    if (!o) st.opp.set(opp, (o = { meet: 0, win: 0 }));
+    o.meet++;
+    if (winner === me) {
+      st.win++;
+      o.win++;
+    }
+  }
 }
 
-// --- Satu simulasi turnamen penuh -> update tally ---
-function simulateOnce(groups: GroupModel[], tally: Map<string, Tally>, ratings?: Record<string, number>) {
+// --- Satu proyeksi turnamen penuh -> update tally ---
+function simulateOnce(
+  groups: GroupModel[],
+  tally: Map<string, Tally>,
+  sample: ScoreSampler,
+  rng: Rng,
+  ratings?: Record<string, number>,
+  paths?: PathTally
+) {
   const firsts: GroupTeam[] = [];
   const seconds: GroupTeam[] = [];
   const thirds: (GroupTeam & { pts: number; gd: number; gf: number })[] = [];
@@ -143,7 +230,7 @@ function simulateOnce(groups: GroupModel[], tally: Map<string, Tally>, ratings?:
     const s = new Map<string, { t: GroupTeam; pts: number; gd: number; gf: number }>();
     for (const t of g.teams) s.set(t.team, { t, pts: t.basePts, gd: t.baseGd, gf: t.baseGf });
     for (const p of g.pending) {
-      const [hg, ag] = simMatchGoals(p.home, p.away, ratings);
+      const [hg, ag] = sample(p.home, p.away);
       const H = s.get(p.home)!, A = s.get(p.away)!;
       H.gf += hg; A.gf += ag; H.gd += hg - ag; A.gd += ag - hg;
       if (hg > ag) H.pts += 3;
@@ -151,7 +238,7 @@ function simulateOnce(groups: GroupModel[], tally: Map<string, Tally>, ratings?:
       else { H.pts += 1; A.pts += 1; }
     }
     const ranked = [...s.values()].sort(
-      (x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || Math.random() - 0.5
+      (x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || rng() - 0.5
     );
     if (ranked[0]) firsts.push(ranked[0].t);
     if (ranked[1]) seconds.push(ranked[1].t);
@@ -159,7 +246,7 @@ function simulateOnce(groups: GroupModel[], tally: Map<string, Tally>, ratings?:
   }
 
   // 8 peringkat-3 terbaik ikut lolos (format 48 tim -> 32 besar)
-  thirds.sort((x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || Math.random() - 0.5);
+  thirds.sort((x, y) => y.pts - x.pts || y.gd - x.gd || y.gf - x.gf || rng() - 0.5);
   const bestThirds = thirds.slice(0, 8);
 
   // daftar seed: juara grup > runner-up > peringkat-3, tiap tingkat diurut kekuatan
@@ -183,58 +270,237 @@ function simulateOnce(groups: GroupModel[], tally: Map<string, Tally>, ratings?:
 
   // milestone berdasar jumlah tim tersisa
   while (bracket.length > 1) {
+    const title = SIZE_TITLE[bracket.length];
     const winners: GroupTeam[] = [];
     for (let i = 0; i < bracket.length; i += 2) {
       const a = bracket[i], b = bracket[i + 1];
       if (!b) { winners.push(a); continue; }
-      const w = knockoutWinner(a.team, b.team, ratings) === a.team ? a : b;
+      const w = knockoutWinner(a.team, b.team, sample, rng, ratings) === a.team ? a : b;
+      if (paths && title) recordPath(paths, title, a.team, b.team, w.team);
       winners.push(w);
     }
     const remaining = winners.length; // tim yang lolos ke ronde berikut
-    for (const w of winners) {
-      const rec = tally.get(w.team)!;
-      if (remaining <= 8) rec.quarter++; // lolos ke QF (8 besar) atau lebih jauh
-    }
+    // milestone dicatat sekali per ronde: lolos ke QF saat tersisa 8 tim, dst.
+    if (remaining === 8) for (const w of winners) tally.get(w.team)!.quarter++;
     bracket = winners;
-    // milestone tambahan
     if (remaining === 4) for (const w of winners) tally.get(w.team)!.semi++;
     if (remaining === 2) for (const w of winners) tally.get(w.team)!.final++;
     if (remaining === 1) tally.get(winners[0].team)!.champion++;
   }
 }
 
-// --- API utama: jalankan N simulasi, panggil onProgress tiap batch ---
-export function runSimulations(
-  matches: Match[],
-  iterations: number,
-  onProgress: (p: SimProgress) => void,
-  batch = 400,
-  ratings?: Record<string, number>
-) {
-  const groups = buildGroups(matches);
-  const tally = makeTally(groups);
+// --- Satu proyeksi dari bracket fase gugur RESMI -> update tally ---
+// Hasil laga gugur yang sudah selesai dikunci; laga dengan pasangan yang
+// sudah diketahui (atau terisi dari pemenang proyeksi) disimulasikan.
+const ROUND_MILESTONE: Record<string, "quarter" | "semi" | "final"> = {
+  "Perempat Final": "quarter",
+  Semifinal: "semi",
+  Final: "final",
+};
 
-  let done = 0;
-  const step = () => {
-    const end = Math.min(done + batch, iterations);
-    for (; done < end; done++) simulateOnce(groups, tally, ratings);
-    onProgress({ done, total: iterations, odds: toOdds(tally, done, ratings) });
-    if (done < iterations) setTimeout(step, 0);
+function simulateKnockoutOnce(
+  ko: KnockoutBracket,
+  tally: Map<string, Tally>,
+  sample: ScoreSampler,
+  rng: Rng,
+  ratings?: Record<string, number>,
+  paths?: PathTally
+) {
+  const bump = (team: string | null, field: keyof Omit<Tally, "team" | "crest">) => {
+    if (!team) return;
+    const rec = tally.get(team);
+    if (rec) rec[field]++;
   };
-  step();
+
+  // milestone ronde yang sudah terlewati sebelum ronde pertama data
+  const passed: ("quarter" | "semi" | "final")[] = [];
+  const allTitles = ["32 Besar", "16 Besar", "Perempat Final", "Semifinal", "Final"];
+  for (const t of allTitles.slice(0, allTitles.indexOf(ko.titles[0]))) {
+    if (ROUND_MILESTONE[t]) passed.push(ROUND_MILESTONE[t]);
+  }
+
+  let carry: (string | null)[] = []; // pemenang ronde sebelumnya, urut slot
+  for (let k = 0; k < ko.rounds.length; k++) {
+    const round = ko.rounds[k];
+    const milestone = ROUND_MILESTONE[ko.titles[k]];
+    const winners: (string | null)[] = [];
+
+    for (let i = 0; i < round.length; i++) {
+      const m = round[i];
+      const home = m.home.name ?? carry[2 * i] ?? null;
+      const away = m.away.name ?? carry[2 * i + 1] ?? null;
+
+      // peserta ronde ini mencapai milestone ronde tsb (dan, untuk ronde
+      // pertama, semua milestone sebelumnya + lolos fase grup)
+      for (const t of [home, away]) {
+        if (milestone) bump(t, milestone);
+        if (k === 0) {
+          bump(t, "advance");
+          for (const p of passed) bump(t, p);
+        }
+      }
+
+      let w: string | null;
+      if (m.finished && m.winner) w = m.winner;
+      else if (home && away) w = knockoutWinner(home, away, sample, rng, ratings);
+      else w = home ?? away; // slot lawan belum diketahui -> lolos sementara
+      if (paths && home && away && w) recordPath(paths, ko.titles[k], home, away, w);
+      winners.push(w);
+    }
+
+    if (ko.titles[k] === "Final") bump(winners[0], "champion");
+    carry = winners;
+  }
 }
 
-// Varian sinkron untuk dipakai server-side (mis. odds peringkat-3 di
-// kalkulator skenario) — tanpa batching setTimeout.
+// --- Inti: jalankan N proyeksi dengan seed tetap -> peluang tiap tim ---
+function runCore(
+  matches: Match[],
+  iterations: number,
+  ratings: Record<string, number> | undefined,
+  seed: number,
+  paths?: PathTally
+): TeamOdds[] {
+  const groups = buildGroups(matches);
+  const tally = makeTally(groups);
+  const rng = mulberry32(seed);
+  const sample = makeSampler(ratings, rng);
+
+  // Begitu undian fase gugur resmi keluar, proyeksi memakai bracket asli
+  // (hasil laga gugur yang selesai dikunci). Sebelum itu, fase gugur
+  // diproyeksikan dari klasemen grup.
+  const ko = buildKnockoutBracket(matches);
+  if (ko) {
+    for (const m of ko.rounds.flat())
+      for (const s of [m.home, m.away])
+        if (s.name && !tally.has(s.name))
+          tally.set(s.name, { team: s.name, crest: s.crest, advance: 0, quarter: 0, semi: 0, final: 0, champion: 0 });
+    for (let i = 0; i < iterations; i++) simulateKnockoutOnce(ko, tally, sample, rng, ratings, paths);
+  } else {
+    for (let i = 0; i < iterations; i++) simulateOnce(groups, tally, sample, rng, ratings, paths);
+  }
+  return toOdds(tally, iterations, ratings);
+}
+
+// ===========================================================================
+//  Jalur Juara: rangkuman per tim dari proyeksi yang sama —
+//  lawan paling mungkin tiap ronde, peluang lolos per gerbang, dan
+//  gerbang tersulit menuju trofi.
+// ===========================================================================
+export interface PathOpponent {
+  team: string;
+  crest?: string;
+  meetProb: number; // % bertemu lawan ini, dengan syarat sampai ronde tsb
+  winProb: number; // % menang bila bertemu lawan ini
+}
+export interface PathRound {
+  title: string;
+  reach: number; // % proyeksi di mana tim ini tampil di ronde tsb
+  winGivenReach: number; // % menang bila sampai ronde tsb
+  opponents: PathOpponent[]; // maks 4, urut paling sering ditemui
+}
+export interface TeamPath {
+  team: string;
+  crest?: string;
+  rating: number;
+  advance: number;
+  champion: number;
+  eliminatedBy?: string; // terisi bila sudah kalah di laga gugur nyata
+  eliminatedRound?: string;
+  hardest: string | null; // ronde tersisa dengan peluang menang terkecil
+  rounds: PathRound[];
+}
+
+const ROUND_SEQ = ["32 Besar", "16 Besar", "Perempat Final", "Semifinal", "Final"];
+
+export function predictPaths(
+  matches: Match[],
+  ratings?: Record<string, number>,
+  iterations = 10000
+): TeamPath[] {
+  const paths: PathTally = new Map();
+  // seed sama dengan predictChampions -> angka konsisten antar halaman
+  const odds = runCore(matches, iterations, ratings, 0x2026_0611, paths);
+  const ko = buildKnockoutBracket(matches);
+  const crestOf = new Map(odds.map((o) => [o.team, o.crest]));
+
+  return odds
+    .filter((o) => paths.has(o.team))
+    .map((o) => {
+      const byRound = paths.get(o.team)!;
+      const rounds: PathRound[] = [];
+      for (const title of ROUND_SEQ) {
+        const st = byRound.get(title);
+        if (!st || !st.reach) continue;
+        const opponents = [...st.opp.entries()]
+          .sort((x, y) => y[1].meet - x[1].meet)
+          .slice(0, 4)
+          .map(([team, v]) => ({
+            team,
+            crest: crestOf.get(team),
+            meetProb: (v.meet / st.reach) * 100,
+            winProb: (v.win / v.meet) * 100,
+          }));
+        rounds.push({
+          title,
+          reach: (st.reach / iterations) * 100,
+          winGivenReach: (st.win / st.reach) * 100,
+          opponents,
+        });
+      }
+
+      // sudah tersingkir? cari kekalahan di laga gugur yang benar-benar selesai
+      let eliminatedBy: string | undefined;
+      let eliminatedRound: string | undefined;
+      if (ko) {
+        outer: for (let k = 0; k < ko.rounds.length; k++)
+          for (const m of ko.rounds[k]) {
+            if (!m.finished || !m.winner) continue;
+            const involved = m.home.name === o.team || m.away.name === o.team;
+            if (involved && m.winner !== o.team) {
+              eliminatedBy = m.winner;
+              eliminatedRound = ko.titles[k];
+              break outer;
+            }
+          }
+      }
+
+      const open = rounds.filter((r) => r.winGivenReach > 0 && r.winGivenReach < 100);
+      const hardest = open.length
+        ? open.reduce((a, b) => (b.winGivenReach < a.winGivenReach ? b : a)).title
+        : null;
+
+      return {
+        team: o.team,
+        crest: o.crest,
+        rating: o.rating,
+        advance: o.advance,
+        champion: o.champion,
+        eliminatedBy,
+        eliminatedRound,
+        hardest,
+        rounds,
+      };
+    });
+}
+
+// API utama halaman Prediksi Juara: proyeksi dalam jumlah besar, deterministik.
+export function predictChampions(
+  matches: Match[],
+  ratings?: Record<string, number>,
+  iterations = 10000
+): TeamOdds[] {
+  return runCore(matches, iterations, ratings, 0x2026_0611);
+}
+
+// Varian ringan untuk dipakai server-side lain (mis. odds peringkat-3 di
+// kalkulator skenario).
 export function runSimulationsSync(
   matches: Match[],
   iterations = 2000,
   ratings?: Record<string, number>
 ): TeamOdds[] {
-  const groups = buildGroups(matches);
-  const tally = makeTally(groups);
-  for (let i = 0; i < iterations; i++) simulateOnce(groups, tally, ratings);
-  return toOdds(tally, iterations, ratings);
+  return runCore(matches, iterations, ratings, 0x5CE_A210);
 }
 
 function makeTally(groups: GroupModel[]): Map<string, Tally> {
