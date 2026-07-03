@@ -1,4 +1,13 @@
-import { Match, MatchStatus, MatchesPayload, DataSource, Scorer } from "./types";
+import {
+  Match,
+  MatchStatus,
+  MatchesPayload,
+  DataSource,
+  Scorer,
+  LineupPlayer,
+  TeamLineup,
+  MatchLineups,
+} from "./types";
 import { flagUrl } from "./countries";
 
 const FD_BASE = "https://api.football-data.org/v4";
@@ -170,6 +179,102 @@ export async function getMatches(): Promise<MatchesPayload> {
 // Public: getScorers() — daftar pencetak gol turnamen (hanya football-data.org;
 // sumber fallback tidak punya data pemain, jadi kembalikan kosong)
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Public: getLineups() — susunan pemain satu laga
+// football-data.org: detail /matches/{id} sudah memuat lineup + bench + coach;
+// API-Football: endpoint terpisah /fixtures/lineups. Sumber fallback openfootball
+// tidak punya data pemain, jadi kembalikan null (bagian lineup disembunyikan).
+// ---------------------------------------------------------------------------
+function fdLineupPlayer(p: any): LineupPlayer {
+  return {
+    id: p?.id ?? null,
+    name: p?.name ?? "?",
+    shirtNumber: p?.shirtNumber ?? null,
+    position: p?.position ?? null,
+    grid: null,
+  };
+}
+
+function normalizeFdLineup(t: any): TeamLineup | null {
+  const startXI = (t?.lineup ?? []).map(fdLineupPlayer);
+  if (startXI.length === 0) return null;
+  return {
+    formation: t?.formation ?? null,
+    coach: t?.coach?.name ?? null,
+    startXI,
+    bench: (t?.bench ?? []).map(fdLineupPlayer),
+  };
+}
+
+function afLineupPlayer(x: any): LineupPlayer {
+  const p = x?.player ?? {};
+  return {
+    id: p.id ?? null,
+    name: p.name ?? "?",
+    shirtNumber: p.number ?? null,
+    position: p.pos ?? null,
+    grid: p.grid ?? null,
+  };
+}
+
+function normalizeAfLineup(r: any): TeamLineup | null {
+  const startXI = (r?.startXI ?? []).map(afLineupPlayer);
+  if (startXI.length === 0) return null;
+  return {
+    formation: r?.formation ?? null,
+    coach: r?.coach?.name ?? null,
+    startXI,
+    bench: (r?.substitutes ?? []).map(afLineupPlayer),
+  };
+}
+
+export async function getLineups(
+  matchId: string,
+  source: DataSource,
+  homeName: string
+): Promise<MatchLineups | null> {
+  try {
+    if (source === "football-data.org") {
+      const fdKey = process.env.FOOTBALL_DATA_API_KEY;
+      if (!fdKey) return null;
+      const res = await fetch(`${FD_BASE}/matches/${matchId}`, {
+        headers: { "X-Auth-Token": fdKey },
+        next: { revalidate: REVALIDATE_SECONDS },
+      });
+      if (!res.ok) return null;
+      const raw = await res.json();
+      const home = normalizeFdLineup(raw.homeTeam);
+      const away = normalizeFdLineup(raw.awayTeam);
+      return home || away ? { home, away } : null;
+    }
+
+    if (source === "api-football") {
+      const afKey = process.env.API_FOOTBALL_KEY;
+      if (!afKey) return null;
+      const res = await fetch(
+        `https://v3.football.api-sports.io/fixtures/lineups?fixture=${matchId}`,
+        {
+          headers: { "x-apisports-key": afKey },
+          next: { revalidate: REVALIDATE_SECONDS },
+        }
+      );
+      if (!res.ok) return null;
+      const rows: any[] = (await res.json()).response ?? [];
+      if (rows.length === 0) return null;
+      // urutan response tidak dijamin home dulu — cocokkan lewat nama tim
+      const homeRow = rows.find((r) => r.team?.name === homeName) ?? rows[0];
+      const awayRow = rows.find((r) => r !== homeRow) ?? null;
+      return {
+        home: normalizeAfLineup(homeRow),
+        away: awayRow ? normalizeAfLineup(awayRow) : null,
+      };
+    }
+  } catch {
+    // lineup bersifat opsional — jangan sampai mematahkan halaman laga
+  }
+  return null;
+}
+
 export async function getScorers(limit = 100): Promise<Scorer[]> {
   const fdKey = process.env.FOOTBALL_DATA_API_KEY;
   if (!fdKey) return [];

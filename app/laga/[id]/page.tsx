@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMatches, getScorers } from "@/lib/football-api";
+import { getMatches, getScorers, getLineups } from "@/lib/football-api";
+import { getMatchHighlights } from "@/lib/highlights";
 import { predict, pct } from "@/lib/prediction";
 import { liveRatings } from "@/lib/elo";
 import { teamForm, headToHead } from "@/lib/stats";
@@ -10,6 +11,8 @@ import { fmtKickoff } from "@/lib/datetime";
 import { Crest, StatusBadge, ProbBar, FormBadges, MatchCard, SourceBanner } from "@/components/ui";
 import { ScoreHeatmap } from "@/components/ScoreHeatmap";
 import { DuelBintang } from "@/components/DuelBintang";
+import { LineupSection } from "@/components/Lineup";
+import { HighlightsSection } from "@/components/Highlights";
 
 export const revalidate = 60;
 // id match berbeda antar sumber data (numeric vs "of-*") — jangan pre-render
@@ -24,6 +27,13 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
   const predictable = isRealTeam(home.name) && isRealTeam(away.name);
   const showScore = status === "FINISHED" || status === "IN_PLAY" || status === "PAUSED";
   const finished = status === "FINISHED" && score.home !== null && score.away !== null;
+
+  // lineup hanya dicari kalau kedua tim sudah pasti (hemat kuota API);
+  // cuplikan video hanya untuk laga yang sudah/sedang berlangsung
+  const [lineups, highlights] = await Promise.all([
+    predictable ? getLineups(match.id, source, home.name) : null,
+    showScore ? getMatchHighlights(match) : [],
+  ]);
 
   const ratings = liveRatings(matches);
   const p = predictable ? predict(home.name, away.name, ratings) : null;
@@ -70,6 +80,9 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
           {match.venue && <span>📍 {match.venue}</span>}
         </div>
       </div>
+
+      {/* Cuplikan video — di luar blok analisis supaya selalu tampil kalau ada */}
+      <HighlightsSection highlights={highlights} />
 
       {!predictable || !p ? (
         <p className="py-10 text-center text-(--color-muted)">
@@ -136,6 +149,9 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
               </p>
             </div>
           </section>
+
+          {/* Susunan pemain */}
+          <LineupSection lineups={lineups} home={home} away={away} isLive={isLive} status={status} />
 
           {/* Duel bintang kedua tim */}
           <DuelBintang home={threats.home} away={threats.away} finished={finished} />
