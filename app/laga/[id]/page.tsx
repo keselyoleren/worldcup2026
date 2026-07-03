@@ -6,6 +6,7 @@ import { liveRatings } from "@/lib/elo";
 import { teamForm, headToHead } from "@/lib/stats";
 import { isRealTeam } from "@/lib/simulate";
 import { teamGoalsMap, matchThreats } from "@/lib/players";
+import { fmtKickoff } from "@/lib/datetime";
 import { Crest, StatusBadge, ProbBar, FormBadges, MatchCard, SourceBanner } from "@/components/ui";
 import { ScoreHeatmap } from "@/components/ScoreHeatmap";
 import { DuelBintang } from "@/components/DuelBintang";
@@ -35,9 +36,7 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
     ? headToHead(matches, home.name, away.name).filter((m) => m.id !== match.id)
     : [];
 
-  const kickoff = new Date(match.utcDate).toLocaleString("id-ID", {
-    weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit",
-  });
+  const kickoff = fmtKickoff(match.utcDate);
 
   return (
     <div>

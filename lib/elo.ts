@@ -1,6 +1,7 @@
 import { Match } from "./types";
 import { ratingOf } from "./prediction";
 import { isRealTeam } from "./simulate";
+import { fmtDateShort } from "./datetime";
 
 // ===========================================================================
 //  Rating Elo live
@@ -60,7 +61,7 @@ const STAGE_LABEL: Record<string, string> = {
 function pointLabel(m: Match): string {
   if (m.stage === "GROUP_STAGE" && m.matchday) return `MD ${m.matchday}`;
   if (STAGE_LABEL[m.stage]) return STAGE_LABEL[m.stage];
-  return new Date(m.utcDate).toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+  return fmtDateShort(m.utcDate);
 }
 
 export function computeElo(matches: Match[]): EloResult {

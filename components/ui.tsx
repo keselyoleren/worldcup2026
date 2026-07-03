@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Match, MatchStatus, DataSource } from "@/lib/types";
 import { pct } from "@/lib/prediction";
+import { fmtDateTime } from "@/lib/datetime";
 
 const STATUS_LABEL: Record<MatchStatus, { text: string; cls: string; live?: boolean }> = {
   SCHEDULED: { text: "Belum Mulai", cls: "text-(--color-muted)" },
@@ -44,12 +45,6 @@ export function Crest({ src, name, size = 22 }: { src?: string; name: string; si
   );
 }
 
-function fmtDate(iso: string) {
-  return new Date(iso).toLocaleString("id-ID", {
-    weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-  });
-}
-
 function stageLabel(m: Match) {
   if (m.group) return m.group;
   return m.stage.replace(/_/g, " ");
@@ -78,7 +73,7 @@ export function MatchCard({ match, href }: { match: Match; href?: string }) {
         <ScoreRow team={away.name} crest={away.crest} goals={score.away} show={show} win={score.winner === "AWAY"} />
       </div>
       <div className="flex items-center justify-between border-t border-(--color-line) px-4 py-2 text-xs text-(--color-muted)">
-        <span>{fmtDate(match.utcDate)}</span>
+        <span>{fmtDateTime(match.utcDate)}</span>
         {match.venue && <span className="truncate pl-3">{match.venue}</span>}
       </div>
     </div>

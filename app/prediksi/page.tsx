@@ -5,6 +5,7 @@ import { liveRatings } from "@/lib/elo";
 import { teamGoalsMap, matchThreats, Threat } from "@/lib/players";
 import { Crest, ProbBar } from "@/components/ui";
 import { Match } from "@/lib/types";
+import { fmtDateTimeShort } from "@/lib/datetime";
 
 export const revalidate = 60;
 
@@ -50,9 +51,7 @@ function PredictionCard({
   threats: { home: Threat | null; away: Threat | null };
 }) {
   const p = predict(match.home.name, match.away.name, ratings);
-  const date = new Date(match.utcDate).toLocaleString("id-ID", {
-    day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
-  });
+  const date = fmtDateTimeShort(match.utcDate);
 
   return (
     <div className="card min-w-0 p-4 transition hover:border-(--color-fg)">

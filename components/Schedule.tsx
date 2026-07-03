@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Match } from "@/lib/types";
+import { fmtDateHeading } from "@/lib/datetime";
 import { MatchCard } from "./ui";
 
 type Filter = "ALL" | "LIVE" | "UPCOMING" | "FINISHED";
@@ -26,9 +27,7 @@ export function Schedule({ matches }: { matches: Match[] }) {
   // Kelompokkan per tanggal
   const byDate = new Map<string, Match[]>();
   for (const m of filtered) {
-    const key = new Date(m.utcDate).toLocaleDateString("id-ID", {
-      weekday: "long", day: "numeric", month: "long", year: "numeric",
-    });
+    const key = fmtDateHeading(m.utcDate);
     (byDate.get(key) ?? byDate.set(key, []).get(key)!).push(m);
   }
 
