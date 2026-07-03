@@ -28,16 +28,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <span className="display text-sm tracking-wide text-(--color-fg)">
               WORLD CUP 2026 · CANADA / USA / MEXICO
             </span>
-            <span>
-              Data:{" "}
-              <a className="underline underline-offset-2 hover:text-(--color-fg)" href="https://www.football-data.org">
-                football-data.org
-              </a>{" "}
-              &{" "}
-              <a className="underline underline-offset-2 hover:text-(--color-fg)" href="https://github.com/openfootball">
-                openfootball
-              </a>
-            </span>
           </div>
         </footer>
       </body>
