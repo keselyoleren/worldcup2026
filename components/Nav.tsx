@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "./AuthProvider";
 
 const LINKS = [
   { href: "/", label: "Jadwal" },
@@ -48,7 +49,48 @@ export function Nav() {
             );
           })}
         </nav>
+
+        <AuthButton />
       </div>
     </header>
+  );
+}
+
+function AuthButton() {
+  const { user, loading, ready, signIn, signOut } = useAuth();
+  if (!ready || loading) return null;
+
+  if (!user) {
+    return (
+      <button
+        onClick={signIn}
+        className="my-auto whitespace-nowrap rounded-full bg-(--color-accent) px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-(--color-ink) transition hover:brightness-110"
+      >
+        Masuk
+      </button>
+    );
+  }
+
+  return (
+    <div className="my-auto flex items-center gap-2">
+      {user.photoURL ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={user.photoURL}
+          alt={user.displayName ?? "Avatar"}
+          title={user.displayName ?? undefined}
+          referrerPolicy="no-referrer"
+          className="h-7 w-7 rounded-full border border-(--color-line)"
+        />
+      ) : (
+        <span className="hidden text-xs text-(--color-muted) sm:inline">{user.displayName}</span>
+      )}
+      <button
+        onClick={signOut}
+        className="whitespace-nowrap text-xs font-semibold uppercase tracking-wide text-(--color-muted) transition hover:text-(--color-fg)"
+      >
+        Keluar
+      </button>
+    </div>
   );
 }

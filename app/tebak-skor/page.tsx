@@ -12,7 +12,7 @@ export default async function TebakSkorPage() {
       <PageHeader
         kicker="Skor tepat = 3 poin · Pemenang benar = 1 poin"
         title="Tebak Skor"
-        sub="Tebak skor akhir tiap laga sebelum kick-off. Poin dihitung otomatis setelah laga selesai, dan tebakanmu tersimpan di browser."
+        sub="Masuk dengan Google, tebak skor akhir tiap laga sebelum kick-off, dan lihat tebakan user lain. Poin dihitung otomatis setelah laga selesai — tebakanmu tersimpan di database dan bisa diakses dari perangkat mana pun."
       />
 
       <SourceBanner source={source} isLive={isLive} />
