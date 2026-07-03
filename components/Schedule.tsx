@@ -34,7 +34,7 @@ export function Schedule({ matches }: { matches: Match[] }) {
 
   const filters: { key: Filter; label: string }[] = [
     { key: "ALL", label: "Semua Laga" },
-    { key: "LIVE", label: "🔴 Sedang Main" },
+    { key: "LIVE", label: "🔴 Berlangsung" },
     { key: "UPCOMING", label: "Akan Datang" },
     { key: "FINISHED", label: "Selesai" },
   ];

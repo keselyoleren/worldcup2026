@@ -11,7 +11,7 @@ export default async function PrediksiLayout({ children }: { children: React.Rea
       <PageHeader
         kicker="Prediksi Otomatis Berbasis Statistik"
         title="Prediksi"
-        sub="Perkiraan skor dari model Poisson bertenaga rating Elo live — plus laporan transparan seberapa akurat model ini sejauh turnamen berjalan."
+        sub="Perkiraan skor tiap laga dihitung otomatis dari kekuatan terkini kedua tim — bukan tebakan pengamat. Ada juga laporan terbuka soal seberapa akurat prediksi kami sejauh turnamen berjalan."
       />
       <SubNav
         items={[

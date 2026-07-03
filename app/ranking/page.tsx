@@ -13,8 +13,8 @@ export default async function RankingPage() {
     <div>
       <PageHeader
         kicker="Kekuatan Tim Terkini"
-        title="Peringkat Elo"
-        sub="Rating Elo tiap tim ter-update otomatis dari setiap hasil laga turnamen — menang lawan tim kuat menaikkan rating lebih banyak. Rating inilah yang dipakai mesin prediksi skor dan prediksi juara."
+        title="Peringkat"
+        sub="Rating tiap tim diperbarui otomatis dari setiap hasil laga — mengalahkan tim kuat menaikkan rating lebih banyak daripada mengalahkan tim lemah. Rating inilah yang jadi dasar semua prediksi di situs ini."
       />
       <SourceBanner source={source} isLive={isLive} />
 

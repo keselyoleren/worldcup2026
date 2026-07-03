@@ -132,8 +132,8 @@ function KnockoutView({ ko, ratings }: { ko: KnockoutBracket; ratings?: Record<s
         </button>
         {loaded && (
           <span className="text-xs text-(--color-muted)">
-            Hasil {finishedCount} laga sudah terkunci dari lapangan — klik nama tim di laga lain
-            untuk memilih pemenangnya.
+            {finishedCount} laga sudah selesai dan hasilnya terkunci. Untuk laga yang belum
+            dimainkan, klik nama tim untuk memilihnya sebagai pemenang.
           </span>
         )}
       </div>
@@ -176,9 +176,9 @@ function KnockoutView({ ko, ratings }: { ko: KnockoutBracket; ratings?: Record<s
       </div>
 
       {ko.thirdPlace && (
-        <div className="card mt-2 flex items-center gap-4 p-4">
+        <div className="card mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 p-4">
           <div className="overline flex-none">Perebutan Peringkat 3</div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <ThirdSide side={ko.thirdPlace.home} />
             <span className="text-(--color-muted)">
               {ko.thirdPlace.scoreHome !== null && ko.thirdPlace.scoreAway !== null
@@ -191,8 +191,8 @@ function KnockoutView({ ko, ratings }: { ko: KnockoutBracket; ratings?: Record<s
       )}
 
       <p className="mt-2 text-xs text-(--color-muted)">
-        Pasangan laga dan hasil diambil dari data resmi turnamen; laga tanpa jangkar hasil disusun
-        sesuai jadwal dan terkoreksi otomatis begitu babak sebelumnya selesai.
+        Pasangan laga dan hasil diambil dari data resmi turnamen. Slot yang masih kosong akan
+        terisi otomatis begitu babak sebelumnya selesai.
       </p>
     </div>
   );
@@ -374,7 +374,7 @@ function ProjectedView({ matches }: { matches: Match[] }) {
               <div key={r} className="flex flex-1 flex-col" style={{ minWidth: 195 }}>
                 <div className="mb-3 flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-(--color-muted)">
                   <span className="h-px flex-none bg-(--color-fg)" style={{ width: 14 }} />
-                  {ROUND_TITLES[r] ?? `Ronde ${r + 1}`}
+                  {ROUND_TITLES[r] ?? `Babak ${r + 1}`}
                 </div>
                 <div className="flex flex-1 flex-col justify-around gap-3">
                   {Array.from({ length: matchCount }).map((_, i) => {

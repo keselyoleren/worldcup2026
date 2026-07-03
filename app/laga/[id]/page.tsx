@@ -132,7 +132,7 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
                 <b className="text-(--color-fg)">{p.awayXg}</b>
               </p>
               <p className="mt-1.5 text-xs text-(--color-muted)">
-                Kekuatan Elo: {home.name} <b className="text-(--color-fg)">{Math.round(p.homeRating)}</b> ·{" "}
+                Kekuatan: {home.name} <b className="text-(--color-fg)">{Math.round(p.homeRating)}</b> ·{" "}
                 {away.name} <b className="text-(--color-fg)">{Math.round(p.awayRating)}</b>
               </p>
             </div>
@@ -171,7 +171,7 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
             <h2 className="mb-3 text-lg font-bold">🤝 Pertemuan di Turnamen Ini</h2>
             {h2h.length === 0 ? (
               <p className="text-sm text-(--color-muted)">
-                Belum pernah bertemu di turnamen ini selain laga ini.
+                Ini pertemuan pertama kedua tim di turnamen ini.
               </p>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2">

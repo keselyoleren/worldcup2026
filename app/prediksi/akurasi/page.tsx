@@ -24,9 +24,9 @@ export default async function AkurasiPage() {
   return (
     <div>
       <p className="mb-6 max-w-3xl text-sm text-(--color-muted)">
-        Kami mengukur model kami sendiri: setiap laga selesai di-prediksi-ulang memakai rating Elo{" "}
-        <b className="text-(--color-fg)">sebelum</b> laga itu dimainkan (tanpa membocorkan hasil), lalu
-        dibandingkan dengan kenyataan. Tidak banyak portal yang berani menampilkan ini.
+        Halaman ini menilai prediksi kami sendiri: setiap laga yang sudah selesai diprediksi ulang
+        memakai rating Elo <b className="text-(--color-fg)">sebelum</b> laga itu dimainkan, lalu
+        dibandingkan dengan skor sebenarnya. Jadi tidak ada bocoran hasil — model dinilai apa adanya.
       </p>
 
       <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -71,8 +71,8 @@ export default async function AkurasiPage() {
       )}
 
       <section className="grid gap-5 md:grid-cols-2">
-        <PredList title="✅ Prediksi Terbaik" subtitle="Tebakan percaya diri yang benar" items={report.best} good />
-        <PredList title="❌ Prediksi Terburuk" subtitle="Tebakan percaya diri yang meleset" items={report.worst} />
+        <PredList title="✅ Prediksi Terbaik" subtitle="Prediksi dengan keyakinan tinggi yang terbukti tepat" items={report.best} good />
+        <PredList title="❌ Prediksi Terburuk" subtitle="Prediksi dengan keyakinan tinggi yang ternyata meleset" items={report.worst} />
       </section>
     </div>
   );

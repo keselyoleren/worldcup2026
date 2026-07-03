@@ -25,9 +25,9 @@ export function DuelBintang({
           <StarSide t={away} finished={finished} right />
         </div>
         <p className="mt-4 border-t border-(--color-line) pt-3 text-[11px] text-(--color-muted)">
-          Pencetak gol terbanyak tiap tim di turnamen ini. Peluang mencetak gol dihitung dari
-          perkiraan gol timnya (model Poisson) dikali porsi gol yang biasa ia sumbang
-          {finished ? " — angka prediksi sebelum laga." : "."}
+          Top skor masing-masing tim di turnamen ini. Peluang cetak golnya dihitung dari
+          perkiraan jumlah gol timnya di laga ini, dikali porsi gol yang biasa ia sumbang
+          {finished ? " — angka prediksi sebelum laga dimainkan." : "."}
         </p>
       </div>
     </section>

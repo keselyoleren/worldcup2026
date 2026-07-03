@@ -52,7 +52,7 @@ export function PrediksiJuara({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ketik nama tim untuk mencari…"
+            placeholder="Cari tim…"
             className="mb-3 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none focus:border-(--color-gold)"
           />
 

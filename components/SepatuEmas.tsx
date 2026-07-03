@@ -95,9 +95,9 @@ export function SepatuEmas({ entries, iterations }: { entries: GoldenBootEntry[]
       </div>
 
       <p className="mt-3 text-xs text-(--color-muted)">
-        "± Laga Tersisa" = rata-rata jumlah laga yang masih akan dimainkan timnya di seluruh
-        proyeksi. Laju gol pemain dikalibrasi agar catatan dari sedikit laga tidak diproyeksikan
-        berlebihan.
+        Kolom "± Laga Tersisa" = perkiraan jumlah laga yang masih akan dimainkan timnya,
+        dirata-rata dari seluruh simulasi. Proyeksi gol pemain yang baru tampil di sedikit laga
+        sengaja dibuat lebih konservatif supaya tidak melambung berlebihan.
       </p>
     </div>
   );

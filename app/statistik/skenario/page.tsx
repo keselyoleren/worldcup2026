@@ -35,10 +35,10 @@ export default async function SkenarioPage() {
   return (
     <div>
       <p className="mb-6 max-w-3xl text-sm text-(--color-muted)">
-        Dihitung dengan mengenumerasi <b className="text-(--color-fg)">semua kemungkinan hasil</b> sisa
-        laga tiap grup — bukan perkiraan. Status &ldquo;pasti&rdquo; benar-benar berarti pasti, apa pun
-        hasil laga lain. Jalur peringkat 3 terbaik (lintas grup) dihitung eksak saat semua grup tuntas,
-        atau lewat simulasi Monte Carlo selama grup masih berjalan.
+        Kami menghitung <b className="text-(--color-fg)">semua kemungkinan hasil</b> sisa laga tiap
+        grup satu per satu — bukan perkiraan kasar. Kalau statusnya &ldquo;pasti&rdquo;, artinya
+        benar-benar pasti, apa pun hasil laga lain. Nasib jalur peringkat 3 terbaik (lintas grup)
+        dihitung eksak saat semua grup tuntas; selama grup masih berjalan, angkanya berasal dari simulasi.
       </p>
 
       <div className="grid gap-5 md:grid-cols-2">

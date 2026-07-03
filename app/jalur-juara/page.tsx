@@ -18,7 +18,7 @@ export default async function JalurJuaraPage() {
       <PageHeader
         kicker="Peta Jalan Tiap Tim"
         title="Jalur Juara"
-        sub="Pilih tim favoritmu dan lihat jalan yang harus mereka lalui menuju trofi: siapa lawan yang paling mungkin di tiap ronde, seberapa besar peluang lolosnya, dan di gerbang mana langkah mereka paling rawan terhenti."
+        sub="Pilih tim favoritmu dan lihat jalan mereka menuju trofi: lawan yang paling mungkin dihadapi di tiap babak, seberapa besar peluang lolosnya, dan di babak mana langkah mereka paling rawan terhenti."
       />
 
       <SourceBanner source={source} isLive={isLive} />

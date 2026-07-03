@@ -55,7 +55,7 @@ function PredictionCard({
   });
 
   return (
-    <div className="card p-4 transition hover:border-(--color-fg)">
+    <div className="card min-w-0 p-4 transition hover:border-(--color-fg)">
       <Link href={`/laga/${match.id}`} className="mb-3 flex items-center justify-between text-xs text-(--color-muted)">
         <span>{match.group ?? match.stage.replace(/_/g, " ")}</span>
         <span className="text-(--color-accent)">Analisis lengkap →</span>
@@ -94,10 +94,10 @@ function PredictionCard({
       )}
 
       {/* Perkiraan gol + skor alternatif */}
-      <div className="mt-3 flex items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs text-(--color-muted)">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-white/5 pt-3 text-xs text-(--color-muted)">
         <span>🕑 {date}</span>
         <span className="flex items-center gap-1.5">
-          <span>Skor lain:</span>
+          <span>Skor alternatif:</span>
           {p.topScores.slice(0, 3).map((s) => (
             <span key={s.score} className="rounded bg-white/5 px-1.5 py-0.5">
               {s.score} <span className="opacity-70">{pct(s.prob)}</span>
@@ -112,11 +112,11 @@ function PredictionCard({
 function ThreatChip({ t, right }: { t: Threat | null; right?: boolean }) {
   if (!t) return <span className="flex-1" />;
   return (
-    <span className={`flex flex-1 items-center gap-1.5 ${right ? "justify-end text-right" : ""}`}>
+    <span className={`flex min-w-0 flex-1 items-center gap-1.5 ${right ? "justify-end text-right" : ""}`}>
       <span className="truncate">
         ⚡ <b className="text-(--color-fg)">{t.scorer.name}</b>{" "}
         <span className="whitespace-nowrap">
-          {Math.round(t.prob * 100)}% cetak gol
+          peluang gol {Math.round(t.prob * 100)}%
         </span>
       </span>
     </span>

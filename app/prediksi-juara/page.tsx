@@ -22,7 +22,7 @@ export default async function PrediksiJuaraPage() {
       <PageHeader
         kicker="Siapa yang Bakal Angkat Trofi?"
         title="Prediksi Juara"
-        sub=""
+        sub="Kami memainkan sisa turnamen 10.000 kali lewat simulasi untuk menghitung peluang tiap tim — dari lolos fase grup sampai jadi juara. Angka diperbarui otomatis setiap ada hasil baru."
       />
 
       <SourceBanner source={source} isLive={isLive} />

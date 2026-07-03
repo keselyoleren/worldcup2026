@@ -69,14 +69,14 @@ export function JalurJuara({ paths }: { paths: TeamPath[] }) {
         <div className="min-w-0 flex-1">
           <div className="display text-3xl">{p.team}</div>
           <div className="text-xs text-(--color-muted)">
-            Elo {Math.round(p.rating * 10 + 1000)}
+            {Math.round(p.rating * 10 + 1000)}
             {p.eliminatedBy ? (
               <span className="ml-2 text-red-400">
                 Tersingkir di {p.eliminatedRound} — kalah dari {p.eliminatedBy}
               </span>
             ) : p.hardest ? (
               <span className="ml-2">
-                Gerbang tersulit: <b className="text-(--color-fg)">{p.hardest}</b>
+                Rintangan terberat: <b className="text-(--color-fg)">{p.hardest}</b>
               </span>
             ) : null}
           </div>
@@ -96,16 +96,16 @@ export function JalurJuara({ paths }: { paths: TeamPath[] }) {
           <div className="card flex items-center gap-3 p-4">
             <span className="text-2xl">🏆</span>
             <div className="flex-1 text-sm">
-              Menjuarai turnamen di <b className="text-(--color-gold)">{fmtPct(p.champion)}</b>{" "}
-              dari seluruh proyeksi.
+              Keluar sebagai juara di <b className="text-(--color-gold)">{fmtPct(p.champion)}</b>{" "}
+              dari seluruh simulasi kami.
             </div>
           </div>
         )}
       </div>
 
       <p className="mt-3 text-xs text-(--color-muted)">
-        Persentase "ketemu" dan "menang bila sampai" bersifat kondisional — dihitung hanya dari
-        proyeksi di mana {p.team} benar-benar tampil di ronde tersebut.
+        Catatan: angka "ketemu" dan "menang" dihitung hanya dari simulasi di mana {p.team}{" "}
+        benar-benar tampil di babak itu — bukan peluang dari awal turnamen.
       </p>
     </div>
   );
@@ -150,31 +150,31 @@ function RoundCard({ r, path }: { r: PathRound; path: TeamPath }) {
         <span className="text-sm font-bold uppercase tracking-wide">{r.title}</span>
         {hardest && (
           <span className="bg-(--color-accent) px-2 py-0.5 text-[10px] font-bold uppercase text-(--color-ink)">
-            Gerbang tersulit
+            Rintangan terberat
           </span>
         )}
         <span className="ml-auto text-xs text-(--color-muted)">
-          sampai ronde ini <b className="text-(--color-fg)">{fmtPct(r.reach)}</b>
+          peluang sampai babak ini <b className="text-(--color-fg)">{fmtPct(r.reach)}</b>
           <span className="mx-1.5">·</span>
-          menang bila sampai <b className="text-(--color-fg)">{fmtPct(r.winGivenReach)}</b>
+          menang jika sampai <b className="text-(--color-fg)">{fmtPct(r.winGivenReach)}</b>
         </span>
       </div>
 
       <div className="space-y-1.5">
         {r.opponents.map((o) => (
-          <div key={o.team} className="flex items-center gap-2 text-xs">
-            <span className="flex w-40 flex-none items-center gap-1.5 truncate">
+          <div key={o.team} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs sm:flex-nowrap">
+            <span className="flex min-w-0 flex-1 items-center gap-1.5 sm:w-40 sm:flex-none">
               <Crest src={o.crest} name={o.team} size={16} />
               <span className="truncate font-medium">{o.team}</span>
             </span>
-            <span className="relative h-2 flex-1 overflow-hidden rounded-full bg-white/10">
+            <span className="flex-none whitespace-nowrap text-right text-(--color-muted) sm:order-last sm:w-44">
+              ketemu {fmtPct(o.meetProb)} · menang {fmtPct(o.winProb)}
+            </span>
+            <span className="relative h-2 w-full overflow-hidden rounded-full bg-white/10 sm:w-auto sm:flex-1">
               <span
                 className="absolute inset-y-0 left-0 rounded-full bg-(--color-accent)/70"
                 style={{ width: `${o.meetProb}%` }}
               />
-            </span>
-            <span className="w-40 flex-none text-right text-(--color-muted)">
-              ketemu {fmtPct(o.meetProb)} · menang {fmtPct(o.winProb)}
             </span>
           </div>
         ))}

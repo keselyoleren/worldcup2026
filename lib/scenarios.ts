@@ -165,7 +165,7 @@ function decidedGroupScenarios(
         status: "HANYA_PERINGKAT_3" as const,
         headline:
           odds !== undefined
-            ? `Menunggu hasil grup lain — peluang lolos sebagai peringkat 3 terbaik: ${Math.round(odds)}% (via simulasi).`
+            ? `Menunggu hasil grup lain — peluang lolos sebagai peringkat 3 terbaik: ${Math.round(odds)}% (hasil simulasi).`
             : "Menunggu hasil grup lain — bisa lolos sebagai salah satu dari 8 peringkat 3 terbaik.",
       };
     }
@@ -307,8 +307,8 @@ function deriveConditions(
     return {
       text:
         odds !== undefined
-          ? `Masih bisa lolos sebagai peringkat 3 terbaik (peluang lolos grup: ${Math.round(odds)}% via simulasi).`
-          : "Masih bisa lolos sebagai salah satu dari 8 peringkat 3 terbaik — lihat halaman Simulasi.",
+          ? `Masih bisa lolos sebagai peringkat 3 terbaik (peluang lolos grup: ${Math.round(odds)}%, hasil simulasi).`
+          : "Masih bisa lolos sebagai salah satu dari 8 peringkat 3 terbaik — lihat halaman Prediksi Juara.",
       certainty: "PASTI",
     };
   };
@@ -381,11 +381,11 @@ function deriveConditions(
     } else {
       headline =
         ownMatches.length > 0
-          ? `Wajib ${winLabel}, plus kombinasi hasil laga lain yang menguntungkan — lihat simulasi.`
+          ? `Wajib ${winLabel}, plus butuh bantuan hasil laga lain yang menguntungkan.`
           : "Nasib sepenuhnya ditentukan hasil laga tim lain.";
     }
   } else {
-    headline = "Peluang 2 besar sangat tipis — butuh keajaiban kombinasi hasil.";
+    headline = "Peluang 2 besar sangat tipis — butuh kombinasi hasil yang nyaris mustahil.";
   }
 
   const tn = thirdNote();

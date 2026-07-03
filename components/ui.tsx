@@ -5,8 +5,8 @@ import { pct } from "@/lib/prediction";
 const STATUS_LABEL: Record<MatchStatus, { text: string; cls: string; live?: boolean }> = {
   SCHEDULED: { text: "Belum Mulai", cls: "text-(--color-muted)" },
   TIMED: { text: "Belum Mulai", cls: "text-(--color-muted)" },
-  IN_PLAY: { text: "Sedang Main", cls: "text-(--color-live)", live: true },
-  PAUSED: { text: "Istirahat", cls: "text-(--color-accent)", live: true },
+  IN_PLAY: { text: "Berlangsung", cls: "text-(--color-live)", live: true },
+  PAUSED: { text: "Turun Minum", cls: "text-(--color-accent)", live: true },
   FINISHED: { text: "Selesai", cls: "text-(--color-win)" },
   POSTPONED: { text: "Ditunda", cls: "text-(--color-muted)" },
   CANCELLED: { text: "Dibatalkan", cls: "text-(--color-muted)" },

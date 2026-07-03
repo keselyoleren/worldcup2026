@@ -13,7 +13,7 @@ export default async function IndeksPage() {
   return (
     <div>
       <p className="mb-6 max-w-3xl text-sm text-(--color-muted)">
-        Tiga indeks khas berbasis data: seberapa mengejutkan sebuah hasil (dibanding ekspektasi Elo
+        Tiga indeks khas berbasis data: seberapa mengejutkan sebuah hasil (dibanding ekspektasi
         pra-laga), grup mana yang paling &ldquo;maut&rdquo; sejak undian, dan laga mana yang paling seru.
       </p>
 
@@ -41,7 +41,7 @@ export default async function IndeksPage() {
                   </p>
                 </div>
                 <span className="flex-none rounded-sm bg-(--color-accent)/15 px-2 py-1 text-xs font-bold text-(--color-accent)">
-                  +{u.eloGap} Elo
+                  +{u.eloGap}
                 </span>
                 <span className="tnum flex-none text-xl text-(--color-accent)">{u.upsetScore}</span>
               </div>
