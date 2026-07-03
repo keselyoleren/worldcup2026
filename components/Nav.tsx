@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useAuth } from "./AuthProvider";
 
 const LINKS = [
@@ -17,8 +18,18 @@ const LINKS = [
   { href: "/tebak-skor", label: "Tebak Skor" },
 ];
 
+function isActive(path: string, href: string) {
+  return path === href || (href !== "/" && path.startsWith(href + "/"));
+}
+
 export function Nav() {
   const path = usePathname();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [path]);
+
   return (
     <header className="sticky top-0 z-50 border-b-2 border-(--color-fg) bg-(--color-bg)/95 backdrop-blur-sm">
       <div className="mx-auto flex max-w-6xl items-stretch justify-between gap-4 px-4 sm:px-6">
@@ -31,9 +42,9 @@ export function Nav() {
           </span>
         </Link>
 
-        <nav className="-mb-[2px] flex items-stretch gap-0 overflow-x-auto">
+        <nav className="-mb-[2px] hidden items-stretch gap-0 overflow-x-auto md:flex">
           {LINKS.map((l) => {
-            const active = path === l.href || (l.href !== "/" && path.startsWith(l.href + "/"));
+            const active = isActive(path, l.href);
             return (
               <Link
                 key={l.href}
@@ -50,8 +61,59 @@ export function Nav() {
           })}
         </nav>
 
-        <AuthButton />
+        <div className="flex items-center gap-3">
+          <AuthButton />
+          <button
+            onClick={() => setOpen((v) => !v)}
+            aria-label={open ? "Tutup menu" : "Buka menu"}
+            aria-expanded={open}
+            className="my-auto flex h-9 w-9 items-center justify-center text-(--color-fg) md:hidden"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              className="h-6 w-6"
+            >
+              {open ? (
+                <>
+                  <path d="M6 6l12 12" />
+                  <path d="M18 6L6 18" />
+                </>
+              ) : (
+                <>
+                  <path d="M4 6h16" />
+                  <path d="M4 12h16" />
+                  <path d="M4 18h16" />
+                </>
+              )}
+            </svg>
+          </button>
+        </div>
       </div>
+
+      {open && (
+        <nav className="border-t border-(--color-line) bg-(--color-bg) md:hidden">
+          {LINKS.map((l) => {
+            const active = isActive(path, l.href);
+            return (
+              <Link
+                key={l.href}
+                href={l.href}
+                className={`flex items-center border-l-4 px-4 py-3 text-sm font-semibold uppercase tracking-wide transition ${
+                  active
+                    ? "border-(--color-accent) bg-(--color-accent)/10 text-(--color-fg)"
+                    : "border-transparent text-(--color-muted) hover:text-(--color-fg)"
+                }`}
+              >
+                {l.label}
+              </Link>
+            );
+          })}
+        </nav>
+      )}
     </header>
   );
 }

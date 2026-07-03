@@ -221,10 +221,7 @@ export function SourceBanner({ source, isLive }: { source: DataSource; isLive: b
     <div className="mb-6 flex items-center gap-2.5 border-b border-(--color-line) pb-3 text-xs text-(--color-muted)">
       {isLive ? <span className="live-dot blink" /> : <span className="h-[7px] w-[7px] rounded-full bg-(--color-muted)" />}
       <span>
-        Sumber data: <span className="font-bold text-(--color-fg)">{source}</span>
-        {isLive
-          ? " — skor diperbarui otomatis setiap menit"
-          : " — data contoh, skor live belum aktif"}
+        Data diperbarui otomatis setiap menit
       </span>
     </div>
   );
