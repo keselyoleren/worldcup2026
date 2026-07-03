@@ -17,6 +17,8 @@ const NAME_TO_ISO2: Record<string, string> = {
   "Cape Verde": "cv", "Cabo Verde": "cv", Jamaica: "jm", Honduras: "hn",
   Bolivia: "bo", Venezuela: "ve", "Curaçao": "cw", Haiti: "ht", Curacao: "cw",
   Angola: "ao", "DR Congo": "cd", "Democratic Republic of Congo": "cd",
+  "Congo DR": "cd", "Bosnia and Herzegovina": "ba", "Bosnia-Herzegovina": "ba",
+  "Bosnia & Herzegovina": "ba",
   Ireland: "ie", Slovakia: "sk", Slovenia: "si", "Czech Republic": "cz",
   Czechia: "cz", Romania: "ro", Hungary: "hu", Albania: "al", Iraq: "iq",
   "United Arab Emirates": "ae", Oman: "om", Bahrain: "bh", Palestine: "ps",

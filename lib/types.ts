@@ -28,7 +28,32 @@ export interface Match {
     home: number | null;
     away: number | null;
     winner: "HOME" | "AWAY" | "DRAW" | null;
+    penalties?: { home: number; away: number } | null; // skor adu penalti (fase gugur)
   };
+  minute?: number | null; // menit berjalan dari sumber live (API-Football)
+  livePhase?: "ET" | "PEN" | null; // penanda perpanjangan waktu / adu penalti
+}
+
+// Fase laga — dipakai model probabilitas live (lib/live-probability.ts)
+export type MatchPhase = "PRE" | "1H" | "HT" | "2H" | "ET" | "PEN" | "FT";
+
+// Event gol dalam laga (tendangan adu penalti TIDAK termasuk)
+export interface GoalEvent {
+  minute: number; // menit reguler; gol injury time memakai batas babak (45/90/120)
+  extra: number | null; // menit tambahan, mis. 45+2 -> minute 45, extra 2
+  side: "HOME" | "AWAY"; // tim yang MENDAPAT gol (own goal sudah dibalik)
+  scorer: string | null;
+  type: "REGULAR" | "OWN" | "PENALTY";
+}
+
+// Detail live satu laga (menit + event gol) — hanya dari sumber realtime;
+// fallback openfootball tidak punya data ini (null)
+export interface MatchLiveDetail {
+  minute: number | null; // menit berjalan dari API (null jika tidak tersedia)
+  phaseHint: MatchPhase | null; // petunjuk fase dari status detail (ET/PEN)
+  events: GoalEvent[];
+  penalties: { home: number; away: number } | null;
+  duration: "REGULAR" | "EXTRA_TIME" | "PENALTY_SHOOTOUT" | null;
 }
 
 // Pencetak gol turnamen (dari endpoint /scorers football-data.org)

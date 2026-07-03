@@ -97,12 +97,17 @@ function tau(h: number, a: number, lh: number, la: number): number {
 const MAX = 8; // grid skor 0..8 gol
 
 // Matriks probabilitas skor ternormalisasi: matrix[golHome][golAway].
+// frac = fraksi waktu tersisa (model live): λ diskalakan sebelum grid dibangun;
+// frac 1 (default) = laga penuh, identik dengan perilaku semula.
 export function scoreMatrix(
   home: string,
   away: string,
-  ratings?: Record<string, number>
+  ratings?: Record<string, number>,
+  frac = 1
 ): { matrix: number[][]; homeXg: number; awayXg: number } {
-  const [lh, la] = expectedGoals(home, away, ratings);
+  const [lh0, la0] = expectedGoals(home, away, ratings);
+  const lh = lh0 * frac;
+  const la = la0 * frac;
   const matrix: number[][] = [];
   let sum = 0;
   for (let i = 0; i <= MAX; i++) {

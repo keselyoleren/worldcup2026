@@ -154,12 +154,16 @@ export function ProbBar({
   homeWin,
   draw,
   awayWin,
+  verb = "menang",
+  hideDraw = false,
 }: {
   homeLabel: string;
   awayLabel: string;
   homeWin: number;
   draw: number;
   awayWin: number;
+  verb?: string; // kata setelah nama tim, mis. "lolos" untuk bar fase gugur
+  hideDraw?: boolean; // sembunyikan label seri (bar dua segmen)
 }) {
   return (
     <div>
@@ -170,11 +174,11 @@ export function ProbBar({
       </div>
       <div className="mt-1.5 flex justify-between gap-2 text-xs">
         <span className="min-w-0 truncate text-(--color-win)">
-          {homeLabel} menang {pct(homeWin)}
+          {homeLabel} {verb} {pct(homeWin)}
         </span>
-        <span className="flex-none text-(--color-muted)">Seri {pct(draw)}</span>
+        {!hideDraw && <span className="flex-none text-(--color-muted)">Seri {pct(draw)}</span>}
         <span className="min-w-0 truncate text-right text-(--color-away)">
-          {awayLabel} menang {pct(awayWin)}
+          {awayLabel} {verb} {pct(awayWin)}
         </span>
       </div>
     </div>

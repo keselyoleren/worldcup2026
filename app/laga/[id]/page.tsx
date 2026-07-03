@@ -1,15 +1,23 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getMatches, getScorers, getLineups } from "@/lib/football-api";
+import { getMatches, getScorers, getLineups, getMatchDetail } from "@/lib/football-api";
 import { getMatchHighlights } from "@/lib/highlights";
 import { predict, pct } from "@/lib/prediction";
 import { liveRatings } from "@/lib/elo";
+import {
+  resolveLiveState,
+  liveOutcome,
+  liveAdvance,
+  buildTimeline,
+  ratingsAsOfMatch,
+} from "@/lib/live-probability";
 import { teamForm, headToHead } from "@/lib/stats";
 import { isRealTeam } from "@/lib/simulate";
 import { teamGoalsMap, matchThreats } from "@/lib/players";
 import { fmtKickoff } from "@/lib/datetime";
 import { Crest, StatusBadge, ProbBar, FormBadges, MatchCard, SourceBanner } from "@/components/ui";
 import { ScoreHeatmap } from "@/components/ScoreHeatmap";
+import { LiveWinProb } from "@/components/LiveWinProb";
 import { DuelBintang } from "@/components/DuelBintang";
 import { LineupSection } from "@/components/Lineup";
 import { HighlightsSection } from "@/components/Highlights";
@@ -19,7 +27,10 @@ export const revalidate = 60;
 
 export default async function LagaPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const [{ matches, source, isLive }, scorers] = await Promise.all([getMatches(), getScorers()]);
+  const [{ matches, source, isLive, fetchedAt }, scorers] = await Promise.all([
+    getMatches(),
+    getScorers(),
+  ]);
   const match = matches.find((m) => m.id === id);
   if (!match) notFound();
 
@@ -29,14 +40,28 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
   const finished = status === "FINISHED" && score.home !== null && score.away !== null;
 
   // lineup hanya dicari kalau kedua tim sudah pasti (hemat kuota API);
-  // cuplikan video hanya untuk laga yang sudah/sedang berlangsung
-  const [lineups, highlights] = await Promise.all([
+  // cuplikan video & detail live hanya untuk laga yang sudah/sedang berlangsung
+  const [lineups, highlights, detail] = await Promise.all([
     predictable ? getLineups(match.id, source, home.name) : null,
     showScore ? getMatchHighlights(match) : [],
+    predictable && showScore ? getMatchDetail(match, source) : null,
   ]);
 
   const ratings = liveRatings(matches);
   const p = predictable ? predict(home.name, away.name, ratings) : null;
+
+  // probabilitas live/rekonstruksi — Elo PRA-laga supaya tak bocor hasil laga ini
+  const knockout = match.stage !== "GROUP_STAGE";
+  const liveState = predictable && showScore ? resolveLiveState(match, detail, fetchedAt) : null;
+  const ratingsPre = liveState ? ratingsAsOfMatch(matches, match) : undefined;
+  const liveProbs = liveState
+    ? knockout
+      ? liveAdvance(home.name, away.name, liveState, ratingsPre)
+      : liveOutcome(home.name, away.name, liveState, ratingsPre)
+    : null;
+  const timeline = liveState
+    ? buildTimeline(home.name, away.name, detail?.events ?? [], liveState, knockout, ratingsPre)
+    : [];
   const threats = predictable
     ? matchThreats(home.name, away.name, scorers, teamGoalsMap(matches), ratings)
     : { home: null, away: null };
@@ -90,9 +115,11 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
         </p>
       ) : (
         <>
-          {/* Peluang hasil */}
+          {/* Peluang hasil (pra-laga) */}
           <section className="mb-8">
-            <h2 className="mb-3 text-lg font-bold">📊 Peluang Hasil</h2>
+            <h2 className="mb-3 text-lg font-bold">
+              📊 Peluang Hasil{showScore ? " — Pra-laga" : ""}
+            </h2>
             <div className="card p-4">
               <ProbBar
                 homeLabel={home.name}
@@ -104,10 +131,25 @@ export default async function LagaPage({ params }: { params: Promise<{ id: strin
               <p className="mt-3 text-[11px] text-(--color-muted)">
                 {finished
                   ? "Prediksi model sebelum laga — bandingkan dengan hasil sebenarnya di peta skor."
-                  : "Dihitung dari kekuatan Elo terkini kedua tim (model Poisson)."}
+                  : showScore
+                    ? "Prediksi model sebelum kickoff — peluang live yang mengikuti skor & menit ada di bawah."
+                    : "Dihitung dari kekuatan Elo terkini kedua tim (model Poisson)."}
               </p>
             </div>
           </section>
+
+          {/* Peluang live / alur peluang sepanjang laga */}
+          {liveState && liveProbs && (
+            <LiveWinProb
+              homeName={home.name}
+              awayName={away.name}
+              probs={liveProbs}
+              points={timeline}
+              events={detail?.events ?? []}
+              state={liveState}
+              knockout={knockout}
+            />
+          )}
 
           {/* Heatmap + skor paling mungkin */}
           <section className="mb-8 grid gap-5 md:grid-cols-2">
