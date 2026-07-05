@@ -1,17 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Anton, Inter } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { AuthProvider } from "@/components/AuthProvider";
+import { ServiceWorkerRegistration } from "@/components/ServiceWorkerRegistration";
 
 const anton = Anton({ weight: "400", subsets: ["latin"], variable: "--font-anton", display: "swap" });
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+
+export const viewport: Viewport = {
+  themeColor: "#0d1210",
+};
 
 export const metadata: Metadata = {
   title: "World Cup 2026 — Jadwal, Statistik & Prediksi",
   description:
     "Portal FIFA World Cup 2026: jadwal pertandingan terbaru, klasemen grup, statistik, prediksi skor, prediksi juara, dan permainan tebak skor.",
+  appleWebApp: {
+    capable: true,
+    title: "WC 2026",
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    apple: "/apple-touch-icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -19,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="id" className={`${anton.variable} ${inter.variable}`}>
       <body>
         <AuthProvider>
+          <ServiceWorkerRegistration />
           <AutoRefresh />
           <Nav />
           <main className="mx-auto max-w-6xl px-4 pb-24 pt-8 sm:px-6">{children}</main>
